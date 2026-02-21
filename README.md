@@ -27,6 +27,11 @@ Starter dashboard for IPL batting analytics using Kaggle ball-by-ball data (defa
   - Includes average runs per innings
   - Sorted by average balls per innings (descending)
   - Minimum 100 balls faced in selected scope (year-wise or combined)
+- Tab 7 (`Dot Ball % by Phase`):
+  - Top 20 bowlers by dot ball percentage in Overs 1-6, Overs 7-14, Overs 15-20
+  - Dot Ball % = Dot balls / Balls bowled
+  - Minimum balls per phase: 60 for yearly views, 180 for consolidated view
+  - Separate tables for 2023, 2024, 2025, and combined 2023-2025
 
 ## Run locally
 ```bash
