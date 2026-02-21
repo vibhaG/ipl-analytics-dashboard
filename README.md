@@ -22,6 +22,11 @@ Starter dashboard for IPL batting analytics using Kaggle ball-by-ball data (defa
   - Top 20 bowlers by bowling strike rate in Overs 1-6, Overs 7-14, Overs 15-20
   - Bowling strike rate = Wickets taken / Balls bowled
   - Separate tables for 2023, 2024, 2025, and combined 2023-2025
+- Tab 6 (`Batter Innings Summary`):
+  - Top 20 batters by average balls batted per innings
+  - Includes average runs per innings
+  - Sorted by average balls per innings (descending)
+  - Minimum 100 balls faced in selected scope (year-wise or combined)
 
 ## Run locally
 ```bash

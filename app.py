@@ -32,6 +32,8 @@ def load_ipl_data(data_path: str) -> pd.DataFrame:
     over_index_candidates = ["ball_over", "over"]
     wides_candidates = ["extra_wides", "wides"]
     noballs_candidates = ["extra_noballs", "noballs"]
+    match_id_candidates = ["match_id", "id"]
+    innings_candidates = ["innings", "innings_val"]
 
     batter_col = next((col for col in batter_candidates if col in df.columns), None)
     runs_col = next((col for col in runs_candidates if col in df.columns), None)
@@ -40,6 +42,8 @@ def load_ipl_data(data_path: str) -> pd.DataFrame:
     over_index_col = next((col for col in over_index_candidates if col in df.columns), None)
     wides_col = next((col for col in wides_candidates if col in df.columns), None)
     noballs_col = next((col for col in noballs_candidates if col in df.columns), None)
+    match_id_col = next((col for col in match_id_candidates if col in df.columns), None)
+    innings_col = next((col for col in innings_candidates if col in df.columns), None)
     ball_col = "ball" if "ball" in df.columns else None
 
     if "season" not in df.columns or not batter_col or not runs_col or not bowler_col:
@@ -56,6 +60,10 @@ def load_ipl_data(data_path: str) -> pd.DataFrame:
         keep_cols.append(wides_col)
     if noballs_col:
         keep_cols.append(noballs_col)
+    if match_id_col:
+        keep_cols.append(match_id_col)
+    if innings_col:
+        keep_cols.append(innings_col)
     if ball_col:
         keep_cols.append(ball_col)
 
@@ -74,6 +82,10 @@ def load_ipl_data(data_path: str) -> pd.DataFrame:
         rename_map[wides_col] = "wides"
     if noballs_col:
         rename_map[noballs_col] = "noballs"
+    if match_id_col:
+        rename_map[match_id_col] = "match_id"
+    if innings_col:
+        rename_map[innings_col] = "innings_id"
     if ball_col:
         rename_map[ball_col] = "ball"
     df = df.rename(columns=rename_map)
@@ -95,6 +107,10 @@ def load_ipl_data(data_path: str) -> pd.DataFrame:
         df["noballs"] = pd.to_numeric(df["noballs"], errors="coerce").fillna(0)
     else:
         df["noballs"] = 0
+    if "match_id" not in df.columns:
+        df["match_id"] = pd.NA
+    if "innings_id" not in df.columns:
+        df["innings_id"] = pd.NA
 
     if "over_index" in df.columns:
         df["over_number"] = pd.to_numeric(df["over_index"], errors="coerce")
@@ -112,6 +128,9 @@ def load_ipl_data(data_path: str) -> pd.DataFrame:
     df["batter"] = df["batter"].astype(str).str.strip()
     df["bowler"] = df["bowler"].astype(str).str.strip()
     df["season"] = df["season"].astype(int)
+    df["match_id"] = df["match_id"].astype(str).str.strip()
+    df["innings_id"] = df["innings_id"].astype(str).str.extract(r"(\d+)", expand=False)
+    df["innings_id"] = pd.to_numeric(df["innings_id"], errors="coerce")
     # Batter does not face legal delivery on wides.
     df["balls_faced"] = (df["wides"] == 0).astype(int)
     # Bowler legal balls exclude wides and no-balls.
@@ -271,6 +290,78 @@ def top_bowling_impact_by_phase(df: pd.DataFrame) -> pd.DataFrame:
     return top_by_phase[["phase", "rank", "bowler", "wickets", "balls", "wicket_per_ball"]]
 
 
+@st.cache_data(show_spinner=False)
+def top_batter_innings_profile(df: pd.DataFrame) -> pd.DataFrame:
+    if "match_id" not in df.columns or "innings_id" not in df.columns:
+        return pd.DataFrame(
+            columns=[
+                "rank",
+                "batter",
+                "innings",
+                "total_balls",
+                "avg_balls_per_innings",
+                "avg_runs_per_innings",
+            ]
+        )
+
+    innings_df = df.dropna(subset=["innings_id"]).copy()
+    innings_df["match_id"] = innings_df["match_id"].astype(str).str.extract(r"(\d+)", expand=False)
+    innings_df = innings_df.dropna(subset=["match_id"]).copy()
+
+    batter_innings = (
+        innings_df.groupby(["batter", "match_id", "innings_id"], as_index=False)
+        .agg(innings_balls=("balls_faced", "sum"), innings_runs=("runs", "sum"))
+    )
+    batter_innings = batter_innings[batter_innings["innings_balls"] > 0].copy()
+    if batter_innings.empty:
+        return pd.DataFrame(
+            columns=[
+                "rank",
+                "batter",
+                "innings",
+                "total_balls",
+                "avg_balls_per_innings",
+                "avg_runs_per_innings",
+            ]
+        )
+
+    summary = (
+        batter_innings.groupby("batter", as_index=False)
+        .agg(
+            innings=("innings_balls", "count"),
+            total_balls=("innings_balls", "sum"),
+            total_runs=("innings_runs", "sum"),
+        )
+    )
+    summary = summary[summary["total_balls"] >= 100].copy()
+    summary["avg_balls_per_innings"] = summary["total_balls"] / summary["innings"]
+    summary["avg_runs_per_innings"] = summary["total_runs"] / summary["innings"]
+
+    summary = (
+        summary.sort_values(
+            ["avg_balls_per_innings", "avg_runs_per_innings", "total_balls", "batter"],
+            ascending=[False, False, False, True],
+        )
+        .head(TOP_N)
+        .reset_index(drop=True)
+        .copy()
+    )
+    summary["rank"] = summary.index + 1
+    summary["avg_balls_per_innings"] = summary["avg_balls_per_innings"].round(2)
+    summary["avg_runs_per_innings"] = summary["avg_runs_per_innings"].round(2)
+
+    return summary[
+        [
+            "rank",
+            "batter",
+            "innings",
+            "total_balls",
+            "avg_balls_per_innings",
+            "avg_runs_per_innings",
+        ]
+    ]
+
+
 def render_main_leaderboards(focus_df: pd.DataFrame, available_years: list[int]) -> None:
     st.subheader("Top 20 Runs and Wickets")
     season_scope = st.radio(
@@ -379,6 +470,26 @@ def render_bowling_impact_phase_leaderboards(focus_df: pd.DataFrame, available_y
         render_bowling_impact_phase_tables(phase_table, "Seasons 2023-2025")
 
 
+def render_batter_innings_summary(focus_df: pd.DataFrame, available_years: list[int]) -> None:
+    st.subheader("Batter Innings Summary")
+    st.caption(
+        "Top 20 batters by average balls batted per innings. "
+        "Minimum 100 balls faced in selected scope."
+    )
+
+    scope_tabs = st.tabs([str(y) for y in available_years] + ["2023-2025 Combined"])
+
+    for idx, year in enumerate(available_years):
+        with scope_tabs[idx]:
+            scoped_df = focus_df[focus_df["season"] == year].copy()
+            summary_table = top_batter_innings_profile(scoped_df)
+            render_batter_innings_summary_table(summary_table, f"Season {year}")
+
+    with scope_tabs[-1]:
+        summary_table = top_batter_innings_profile(focus_df)
+        render_batter_innings_summary_table(summary_table, "Seasons 2023-2025")
+
+
 def render_phase_tables(phase_table: pd.DataFrame, title_prefix: str) -> None:
     if phase_table.empty:
         st.warning("No phase data available for this scope.")
@@ -479,6 +590,24 @@ def render_bowling_impact_phase_tables(phase_table: pd.DataFrame, title_prefix: 
                 st.dataframe(phase_df, use_container_width=True, hide_index=True)
 
 
+def render_batter_innings_summary_table(summary_table: pd.DataFrame, title_prefix: str) -> None:
+    if summary_table.empty:
+        st.warning(f"No eligible batter data for {title_prefix}.")
+        return
+
+    display_df = summary_table.rename(
+        columns={
+            "rank": "Rank",
+            "batter": "Batter",
+            "innings": "Innings",
+            "total_balls": "Total Balls",
+            "avg_balls_per_innings": "Avg Balls/Innings",
+            "avg_runs_per_innings": "Avg Runs/Innings",
+        }
+    )
+    st.dataframe(display_df, use_container_width=True, hide_index=True)
+
+
 st.title("IPL Dashboards (2023-2025)")
 st.caption("Built from ball-by-ball IPL data.")
 
@@ -515,13 +644,14 @@ if focus_df.empty:
     st.warning("No data available in seasons 2023-2025.")
     st.stop()
 
-main_tab, phase_runs_tab, phase_wickets_tab, batter_impact_tab, bowling_impact_tab = st.tabs(
+main_tab, phase_runs_tab, phase_wickets_tab, batter_impact_tab, bowling_impact_tab, batter_summary_tab = st.tabs(
     [
         "Runs & Wickets",
         "Phase-wise Runs",
         "Phase-wise Wickets",
         "Batter Impact by Phase",
         "Bowling Impact by Phase",
+        "Batter Innings Summary",
     ]
 )
 
@@ -539,3 +669,6 @@ with batter_impact_tab:
 
 with bowling_impact_tab:
     render_bowling_impact_phase_leaderboards(focus_df, available_years)
+
+with batter_summary_tab:
+    render_batter_innings_summary(focus_df, available_years)
