@@ -21,6 +21,7 @@ Starter dashboard for IPL batting analytics using Kaggle ball-by-ball data (defa
 - Tab 5 (`Bowling Impact by Phase`):
   - Top 20 bowlers by bowling strike rate in Overs 1-6, Overs 7-14, Overs 15-20
   - Bowling strike rate = Wickets taken / Balls bowled
+  - Minimum balls per phase: 60 for yearly views, 180 for consolidated view
   - Separate tables for 2023, 2024, 2025, and combined 2023-2025
 - Tab 6 (`Batter Innings Summary`):
   - Top 20 batters by average balls batted per innings
@@ -31,6 +32,29 @@ Starter dashboard for IPL batting analytics using Kaggle ball-by-ball data (defa
   - Top 20 bowlers by dot ball percentage in Overs 1-6, Overs 7-14, Overs 15-20
   - Dot Ball % = Dot balls / Balls bowled
   - Minimum balls per phase: 60 for yearly views, 180 for consolidated view
+  - Separate tables for 2023, 2024, 2025, and combined 2023-2025
+- Tab 8 (`Boundary Impact by Phase`):
+  - Top 20 batters by boundaries hit / balls faced in Overs 1-6, Overs 7-14, Overs 15-20
+  - Boundary = 4 or 6
+  - Minimum balls per phase: 60 for yearly views, 180 for consolidated view
+  - Separate tables for 2023, 2024, 2025, and combined 2023-2025
+- Tab 9 (`Runs/Wicket by Phase`):
+  - Top 20 bowlers by (Runs conceded / Wickets taken), ranked ascending
+  - Minimum balls per phase: 60 for yearly views, 180 for consolidated view
+  - Separate tables for 2023, 2024, 2025, and combined 2023-2025
+- Tab 10 (`Batting Variance`):
+  - Top 20 batters by least-to-most variance of runs per innings
+  - Minimum runs scored: >250 for yearly views, >600 for consolidated view
+  - Separate tables for 2023, 2024, 2025, and combined 2023-2025
+- Tab 11 (`30+ Scores`):
+  - Top 20 batters sorted by `% of 30+ Scores` (descending)
+  - `% of 30+ Scores = (30+ Innings / Total Innings) * 100`
+  - Minimum runs scored: >=250 for yearly views, >=600 for consolidated view
+  - Separate tables for 2023, 2024, 2025, and combined 2023-2025
+- Tab 12 (`2+ Wkts %`):
+  - Top 20 bowlers sorted by `% of innings with 2+ wickets` (descending)
+  - `% 2+ Wkt Innings = (2+ wicket innings / innings bowled) * 100`
+  - Minimum matches played: >=7 for yearly views, >=18 for consolidated view
   - Separate tables for 2023, 2024, 2025, and combined 2023-2025
 
 ## Run locally
