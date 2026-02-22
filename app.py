@@ -1157,6 +1157,74 @@ def venue_innings_averages(df: pd.DataFrame) -> pd.DataFrame:
     ).reset_index(drop=True)
 
 
+@st.cache_data(show_spinner=False)
+def top_batters_by_venue(df: pd.DataFrame, min_innings_at_venue: int) -> pd.DataFrame:
+    required = {"venue", "city", "match_id", "innings_id", "batter", "runs", "balls_faced"}
+    if not required.issubset(df.columns):
+        return pd.DataFrame()
+
+    work = df.dropna(subset=["innings_id"]).copy()
+    work["match_id"] = work["match_id"].astype(str).str.extract(r"(\d+)", expand=False)
+    work = work.dropna(subset=["match_id"]).copy()
+    work["is_boundary"] = work["runs"].isin([4, 6]).astype(int)
+
+    batter_innings_venue = (
+        work.groupby(["venue", "city", "batter", "match_id", "innings_id"], as_index=False)
+        .agg(
+            innings_runs=("runs", "sum"),
+            innings_balls=("balls_faced", "sum"),
+            innings_boundaries=("is_boundary", "sum"),
+        )
+    )
+    batter_innings_venue = batter_innings_venue[batter_innings_venue["innings_balls"] > 0].copy()
+    if batter_innings_venue.empty:
+        return pd.DataFrame()
+
+    summary = (
+        batter_innings_venue.groupby(["venue", "city", "batter"], as_index=False)
+        .agg(
+            innings=("innings_runs", "count"),
+            runs=("innings_runs", "sum"),
+            balls=("innings_balls", "sum"),
+            boundaries=("innings_boundaries", "sum"),
+        )
+    )
+    summary = summary[summary["innings"] >= min_innings_at_venue].copy()
+    if summary.empty:
+        return pd.DataFrame()
+
+    summary["avg_runs_per_innings"] = summary["runs"] / summary["innings"]
+    summary["strike_rate"] = (summary["runs"] / summary["balls"]) * 100
+    summary["balls_per_boundary"] = summary["balls"] / summary["boundaries"].replace(0, pd.NA)
+
+    top3 = (
+        summary.sort_values(
+            ["venue", "avg_runs_per_innings", "runs", "strike_rate", "batter"],
+            ascending=[True, False, False, False, True],
+        )
+        .groupby(["venue", "city"], group_keys=False)
+        .head(3)
+        .copy()
+    )
+    top3["rank_in_venue"] = top3.groupby(["venue", "city"]).cumcount() + 1
+    for col in ["avg_runs_per_innings", "strike_rate", "balls_per_boundary"]:
+        top3[col] = pd.to_numeric(top3[col], errors="coerce").round(2)
+
+    return top3[
+        [
+            "venue",
+            "city",
+            "rank_in_venue",
+            "batter",
+            "innings",
+            "runs",
+            "avg_runs_per_innings",
+            "strike_rate",
+            "balls_per_boundary",
+        ]
+    ].sort_values(["venue", "rank_in_venue"]).reset_index(drop=True)
+
+
 def _add_venue_score_trend_columns(
     current_df: pd.DataFrame,
     reference_df: pd.DataFrame,
@@ -1562,6 +1630,27 @@ def render_franchise_squad_consistency_tab(raw_df: pd.DataFrame, available_years
             st.dataframe(display_df, use_container_width=True, hide_index=True)
 
 
+def render_best_batters_by_venue_tab(focus_df: pd.DataFrame, available_years: list[int]) -> None:
+    st.subheader("Best Batters by Venue")
+    st.caption(
+        "Top 3 batters at each venue ranked by average runs per innings. "
+        "Metrics shown: total runs, average runs/innings, strike rate, balls per boundary. "
+        "Min innings at venue: 2 (yearly), 5 (combined)."
+    )
+
+    scope_tabs = st.tabs([str(y) for y in available_years] + ["2023-2025 Combined"])
+
+    for idx, year in enumerate(available_years):
+        with scope_tabs[idx]:
+            scoped_df = focus_df[focus_df["season"] == year].copy()
+            table = top_batters_by_venue(scoped_df, min_innings_at_venue=2)
+            render_best_batters_by_venue_table(table, f"Season {year}")
+
+    with scope_tabs[-1]:
+        table = top_batters_by_venue(focus_df, min_innings_at_venue=5)
+        render_best_batters_by_venue_table(table, "Seasons 2023-2025")
+
+
 def render_phase_tables(phase_table: pd.DataFrame, title_prefix: str) -> None:
     if phase_table.empty:
         st.warning("No phase data available for this scope.")
@@ -1825,6 +1914,27 @@ def render_bowler_2w_table(summary_table: pd.DataFrame, title_prefix: str) -> No
     st.dataframe(display_df, use_container_width=True, hide_index=True)
 
 
+def render_best_batters_by_venue_table(table: pd.DataFrame, title_prefix: str) -> None:
+    if table.empty:
+        st.warning(f"No eligible venue-batter data for {title_prefix}.")
+        return
+
+    display_df = table.rename(
+        columns={
+            "venue": "Venue",
+            "city": "City",
+            "rank_in_venue": "Rank in Venue",
+            "batter": "Batter",
+            "innings": "Innings",
+            "runs": "Runs",
+            "avg_runs_per_innings": "Avg Runs/Innings",
+            "strike_rate": "Strike Rate",
+            "balls_per_boundary": "Balls/Boundary",
+        }
+    )
+    st.dataframe(display_df, use_container_width=True, hide_index=True)
+
+
 def render_venue_and_milestones(
     scoped_df: pd.DataFrame,
     title_prefix: str,
@@ -1913,7 +2023,7 @@ if focus_df.empty:
     st.warning("No data available in seasons 2023-2025.")
     st.stop()
 
-main_tab, phase_runs_tab, phase_wickets_tab, batter_impact_tab, bowling_impact_tab, batter_summary_tab, dot_ball_tab, boundary_impact_tab, bowling_avg_tab, batter_variance_tab, batter_30plus_tab, bowler_2w_tab, venue_summary_tab, franchise_consistency_tab = st.tabs(
+main_tab, phase_runs_tab, phase_wickets_tab, batter_impact_tab, bowling_impact_tab, batter_summary_tab, dot_ball_tab, boundary_impact_tab, bowling_avg_tab, batter_variance_tab, batter_30plus_tab, bowler_2w_tab, venue_summary_tab, franchise_consistency_tab, best_batters_venue_tab = st.tabs(
     [
         "Runs & Wickets",
         "Phase-wise Runs",
@@ -1929,6 +2039,7 @@ main_tab, phase_runs_tab, phase_wickets_tab, batter_impact_tab, bowling_impact_t
         "2+ Wkts %",
         "Venue Summary",
         "Franchise Consistency",
+        "Best Batters by Venue",
     ]
 )
 
@@ -1973,3 +2084,6 @@ with venue_summary_tab:
 
 with franchise_consistency_tab:
     render_franchise_squad_consistency_tab(raw_df, available_years)
+
+with best_batters_venue_tab:
+    render_best_batters_by_venue_tab(focus_df, available_years)
