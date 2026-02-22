@@ -56,6 +56,10 @@ Starter dashboard for IPL batting analytics using Kaggle ball-by-ball data (defa
   - `% 2+ Wkt Innings = (2+ wicket innings / innings bowled) * 100`
   - Minimum matches played: >=7 for yearly views, >=18 for consolidated view
   - Separate tables for 2023, 2024, 2025, and combined 2023-2025
+- Tab 13 (`Venue Summary`):
+  - Venue-wise average total score and average boundaries (4s+6s), split by 1st and 2nd innings
+  - Available for 2023, 2024, 2025, and combined 2023-2025
+  - Includes milestone totals for the selected scope: 50+ scores, 100+ scores, 2+ wicket hauls, 4+ wicket hauls
 
 ## Run locally
 ```bash

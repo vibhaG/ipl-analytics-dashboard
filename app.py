@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import ast
+import re
 from pathlib import Path
 
 import pandas as pd
@@ -26,8 +28,16 @@ def load_ipl_data(data_path: str) -> pd.DataFrame:
     df = pd.read_csv(data_path, low_memory=False)
 
     batter_candidates = ["striker", "batter"]
+    non_striker_candidates = ["non_striker"]
     runs_candidates = ["runs_off_bat", "runs_batter"]
     bowler_candidates = ["bowler"]
+    batting_team_candidates = ["batting_team"]
+    bowling_team_candidates = ["bowling_team"]
+    team_a_candidates = ["team_a"]
+    team_b_candidates = ["team_b"]
+    wicket_fielders_candidates = ["wicket_fielders"]
+    replacement_in_candidates = ["replacement_in"]
+    replacements_out_candidates = ["replacements_out", "replacement_out"]
     wicket_kind_candidates = ["wicket_kind", "wicket_type"]
     over_index_candidates = ["ball_over", "over"]
     wides_candidates = ["extra_wides", "wides"]
@@ -36,10 +46,21 @@ def load_ipl_data(data_path: str) -> pd.DataFrame:
     extras_candidates = ["extras", "runs_extras"]
     match_id_candidates = ["match_id", "id"]
     innings_candidates = ["innings", "innings_val"]
+    venue_candidates = ["venue"]
+    city_candidates = ["city"]
+    date_candidates = ["dates", "start_date", "date"]
 
     batter_col = next((col for col in batter_candidates if col in df.columns), None)
+    non_striker_col = next((col for col in non_striker_candidates if col in df.columns), None)
     runs_col = next((col for col in runs_candidates if col in df.columns), None)
     bowler_col = next((col for col in bowler_candidates if col in df.columns), None)
+    batting_team_col = next((col for col in batting_team_candidates if col in df.columns), None)
+    bowling_team_col = next((col for col in bowling_team_candidates if col in df.columns), None)
+    team_a_col = next((col for col in team_a_candidates if col in df.columns), None)
+    team_b_col = next((col for col in team_b_candidates if col in df.columns), None)
+    wicket_fielders_col = next((col for col in wicket_fielders_candidates if col in df.columns), None)
+    replacement_in_col = next((col for col in replacement_in_candidates if col in df.columns), None)
+    replacements_out_col = next((col for col in replacements_out_candidates if col in df.columns), None)
     wicket_kind_col = next((col for col in wicket_kind_candidates if col in df.columns), None)
     over_index_col = next((col for col in over_index_candidates if col in df.columns), None)
     wides_col = next((col for col in wides_candidates if col in df.columns), None)
@@ -48,6 +69,9 @@ def load_ipl_data(data_path: str) -> pd.DataFrame:
     extras_col = next((col for col in extras_candidates if col in df.columns), None)
     match_id_col = next((col for col in match_id_candidates if col in df.columns), None)
     innings_col = next((col for col in innings_candidates if col in df.columns), None)
+    venue_col = next((col for col in venue_candidates if col in df.columns), None)
+    city_col = next((col for col in city_candidates if col in df.columns), None)
+    date_col = next((col for col in date_candidates if col in df.columns), None)
     ball_col = "ball" if "ball" in df.columns else None
 
     if "season" not in df.columns or not batter_col or not runs_col or not bowler_col:
@@ -56,6 +80,22 @@ def load_ipl_data(data_path: str) -> pd.DataFrame:
         )
 
     keep_cols = ["season", batter_col, runs_col, bowler_col]
+    if non_striker_col:
+        keep_cols.append(non_striker_col)
+    if batting_team_col:
+        keep_cols.append(batting_team_col)
+    if bowling_team_col:
+        keep_cols.append(bowling_team_col)
+    if team_a_col:
+        keep_cols.append(team_a_col)
+    if team_b_col:
+        keep_cols.append(team_b_col)
+    if wicket_fielders_col:
+        keep_cols.append(wicket_fielders_col)
+    if replacement_in_col:
+        keep_cols.append(replacement_in_col)
+    if replacements_out_col:
+        keep_cols.append(replacements_out_col)
     if wicket_kind_col:
         keep_cols.append(wicket_kind_col)
     if over_index_col:
@@ -72,6 +112,12 @@ def load_ipl_data(data_path: str) -> pd.DataFrame:
         keep_cols.append(match_id_col)
     if innings_col:
         keep_cols.append(innings_col)
+    if venue_col:
+        keep_cols.append(venue_col)
+    if city_col:
+        keep_cols.append(city_col)
+    if date_col:
+        keep_cols.append(date_col)
     if ball_col:
         keep_cols.append(ball_col)
 
@@ -82,6 +128,22 @@ def load_ipl_data(data_path: str) -> pd.DataFrame:
         runs_col: "runs",
         bowler_col: "bowler",
     }
+    if non_striker_col:
+        rename_map[non_striker_col] = "non_striker"
+    if batting_team_col:
+        rename_map[batting_team_col] = "batting_team"
+    if bowling_team_col:
+        rename_map[bowling_team_col] = "bowling_team"
+    if team_a_col:
+        rename_map[team_a_col] = "team_a"
+    if team_b_col:
+        rename_map[team_b_col] = "team_b"
+    if wicket_fielders_col:
+        rename_map[wicket_fielders_col] = "wicket_fielders"
+    if replacement_in_col:
+        rename_map[replacement_in_col] = "replacement_in"
+    if replacements_out_col:
+        rename_map[replacements_out_col] = "replacements_out"
     if wicket_kind_col:
         rename_map[wicket_kind_col] = "wicket_kind"
     if over_index_col:
@@ -98,6 +160,12 @@ def load_ipl_data(data_path: str) -> pd.DataFrame:
         rename_map[match_id_col] = "match_id"
     if innings_col:
         rename_map[innings_col] = "innings_id"
+    if venue_col:
+        rename_map[venue_col] = "venue"
+    if city_col:
+        rename_map[city_col] = "city"
+    if date_col:
+        rename_map[date_col] = "match_date_raw"
     if ball_col:
         rename_map[ball_col] = "ball"
     df = df.rename(columns=rename_map)
@@ -131,6 +199,28 @@ def load_ipl_data(data_path: str) -> pd.DataFrame:
         df["match_id"] = pd.NA
     if "innings_id" not in df.columns:
         df["innings_id"] = pd.NA
+    if "venue" not in df.columns:
+        df["venue"] = "Unknown"
+    if "city" not in df.columns:
+        df["city"] = "Unknown"
+    if "non_striker" not in df.columns:
+        df["non_striker"] = pd.NA
+    if "batting_team" not in df.columns:
+        df["batting_team"] = pd.NA
+    if "bowling_team" not in df.columns:
+        df["bowling_team"] = pd.NA
+    if "team_a" not in df.columns:
+        df["team_a"] = pd.NA
+    if "team_b" not in df.columns:
+        df["team_b"] = pd.NA
+    if "wicket_fielders" not in df.columns:
+        df["wicket_fielders"] = pd.NA
+    if "replacement_in" not in df.columns:
+        df["replacement_in"] = pd.NA
+    if "replacements_out" not in df.columns:
+        df["replacements_out"] = pd.NA
+    if "match_date_raw" not in df.columns:
+        df["match_date_raw"] = pd.NA
 
     if "over_index" in df.columns:
         df["over_number"] = pd.to_numeric(df["over_index"], errors="coerce")
@@ -151,6 +241,35 @@ def load_ipl_data(data_path: str) -> pd.DataFrame:
     df["match_id"] = df["match_id"].astype(str).str.strip()
     df["innings_id"] = df["innings_id"].astype(str).str.extract(r"(\d+)", expand=False)
     df["innings_id"] = pd.to_numeric(df["innings_id"], errors="coerce")
+    df["venue"] = df["venue"].fillna("Unknown").astype(str).str.strip().replace("", "Unknown")
+    df["city"] = df["city"].fillna("Unknown").astype(str).str.strip().replace("", "Unknown")
+    df["non_striker"] = df["non_striker"].astype(str).str.strip()
+    df["batting_team"] = df["batting_team"].astype(str).str.strip()
+    df["bowling_team"] = df["bowling_team"].astype(str).str.strip()
+    df["team_a"] = df["team_a"].astype(str).str.strip()
+    df["team_b"] = df["team_b"].astype(str).str.strip()
+    df["wicket_fielders"] = df["wicket_fielders"].astype(str).str.strip()
+    df["replacement_in"] = df["replacement_in"].astype(str).str.strip()
+    df["replacements_out"] = df["replacements_out"].astype(str).str.strip()
+    # Derive bowling team when dataset omits it (common in some schemas with team_a/team_b + batting_team).
+    missing_bowling = df["bowling_team"].str.lower().isin({"", "nan", "none", "<na>"})
+    team_a_valid = ~df["team_a"].str.lower().isin({"", "nan", "none", "<na>"})
+    team_b_valid = ~df["team_b"].str.lower().isin({"", "nan", "none", "<na>"})
+    batting_equals_a = df["batting_team"] == df["team_a"]
+    batting_equals_b = df["batting_team"] == df["team_b"]
+    df.loc[missing_bowling & batting_equals_a & team_b_valid, "bowling_team"] = df.loc[
+        missing_bowling & batting_equals_a & team_b_valid, "team_b"
+    ]
+    df.loc[missing_bowling & batting_equals_b & team_a_valid, "bowling_team"] = df.loc[
+        missing_bowling & batting_equals_b & team_a_valid, "team_a"
+    ]
+    df["match_date"] = pd.to_datetime(
+        df["match_date_raw"].astype(str).str.extract(r"(\d{4}-\d{2}-\d{2})", expand=False),
+        errors="coerce",
+    )
+    # Normalize inconsistent city labels for the same venue across seasons.
+    maharaja_mask = df["venue"].str.contains("Maharaja Yadavindra Singh", case=False, na=False)
+    df.loc[maharaja_mask, "city"] = "New Chandigarh"
     if df["total_runs"].isna().any():
         if df["extras"].notna().any():
             df["total_runs"] = df["total_runs"].fillna(df["runs"] + df["extras"])
@@ -672,6 +791,440 @@ def top_bowler_2w_innings_pct(df: pd.DataFrame, min_matches: int) -> pd.DataFram
     ]
 
 
+@st.cache_data(show_spinner=False)
+def franchise_player_participation(df: pd.DataFrame) -> pd.DataFrame:
+    required = {
+        "season",
+        "match_id",
+        "match_date",
+        "batting_team",
+        "bowling_team",
+        "batter",
+        "non_striker",
+        "bowler",
+    }
+    if not required.issubset(df.columns):
+        return pd.DataFrame(columns=["season", "match_id", "match_date", "franchise", "player"])
+
+    base_cols = ["season", "match_id", "match_date"]
+    batting_striker = df[base_cols + ["batting_team", "batter"]].rename(
+        columns={"batting_team": "franchise", "batter": "player"}
+    )
+    batting_non_striker = df[base_cols + ["batting_team", "non_striker"]].rename(
+        columns={"batting_team": "franchise", "non_striker": "player"}
+    )
+    bowling = df[base_cols + ["bowling_team", "bowler"]].rename(
+        columns={"bowling_team": "franchise", "bowler": "player"}
+    )
+    # Fielders are part of the bowling side's XI and should count as appearances.
+    fielders_rows = []
+    if "wicket_fielders" in df.columns:
+        fdf = df[base_cols + ["bowling_team", "wicket_fielders"]].copy()
+
+        def _extract_names(raw: object) -> list[str]:
+            if raw is None or (isinstance(raw, float) and pd.isna(raw)):
+                return []
+            text = str(raw).strip()
+            if not text or text.lower() in {"nan", "<na>", "none"}:
+                return []
+            # Common format in this dataset: {"Name"} or {"Name A","Name B"}
+            quoted = re.findall(r'"([^"]+)"', text)
+            if quoted:
+                return [q.strip() for q in quoted if q.strip()]
+            try:
+                parsed = ast.literal_eval(text)
+                if isinstance(parsed, (set, list, tuple)):
+                    return [str(x).strip() for x in parsed if str(x).strip()]
+                if isinstance(parsed, str) and parsed.strip():
+                    return [parsed.strip()]
+            except Exception:
+                pass
+            return [text]
+
+        for row in fdf.itertuples(index=False):
+            for name in _extract_names(getattr(row, "wicket_fielders")):
+                fielders_rows.append(
+                    {
+                        "season": getattr(row, "season"),
+                        "match_id": getattr(row, "match_id"),
+                        "match_date": getattr(row, "match_date"),
+                        "franchise": getattr(row, "bowling_team"),
+                        "player": name,
+                    }
+                )
+    fielders = pd.DataFrame(fielders_rows)
+
+    players = pd.concat([batting_striker, batting_non_striker, bowling, fielders], ignore_index=True)
+    players["player"] = players["player"].astype(str).str.strip()
+    players["franchise"] = players["franchise"].astype(str).str.strip()
+    players["match_id"] = players["match_id"].astype(str).str.extract(r"(\d+)", expand=False)
+    invalid = {"", "nan", "none", "<na>"}
+    players = players[~players["player"].str.lower().isin(invalid)].copy()
+    players = players[~players["franchise"].str.lower().isin(invalid)].copy()
+    players = players.dropna(subset=["season", "match_id"]).drop_duplicates(
+        subset=["season", "match_id", "franchise", "player"]
+    )
+    players["season"] = pd.to_numeric(players["season"], errors="coerce")
+    players = players.dropna(subset=["season"]).copy()
+    players["season"] = players["season"].astype(int)
+
+    # Add impact-sub replacement appearances (replacement_in and replacements_out) with best-effort
+    # franchise attribution using players already seen in the same match.
+    if {"replacement_in", "replacements_out", "batting_team", "bowling_team"}.issubset(df.columns):
+        invalid = {"", "nan", "none", "<na>"}
+        base_match_map = (
+            players.groupby(["season", "match_id", "player"])["franchise"]
+            .agg(lambda s: sorted(set(x for x in s if str(x).strip())))
+            .reset_index(name="known_franchises")
+        )
+        base_lookup = {
+            (int(r.season), str(r.match_id), str(r.player)): r.known_franchises
+            for r in base_match_map.itertuples(index=False)
+        }
+
+        repl_rows = []
+        repl_df = df[
+            [
+                "season",
+                "match_id",
+                "match_date",
+                "batting_team",
+                "bowling_team",
+                "replacement_in",
+                "replacements_out",
+            ]
+        ].copy()
+        repl_df["match_id"] = repl_df["match_id"].astype(str).str.extract(r"(\d+)", expand=False)
+
+        for row in repl_df.itertuples(index=False):
+            season = pd.to_numeric(getattr(row, "season"), errors="coerce")
+            match_id = getattr(row, "match_id")
+            if pd.isna(season) or not match_id:
+                continue
+            season = int(season)
+            batting_team = str(getattr(row, "batting_team")).strip()
+            bowling_team = str(getattr(row, "bowling_team")).strip()
+            candidates = [t for t in [batting_team, bowling_team] if t and t.lower() not in invalid]
+
+            names = []
+            for raw_name in [getattr(row, "replacement_in"), getattr(row, "replacements_out")]:
+                name = str(raw_name).strip()
+                if name and name.lower() not in invalid:
+                    names.append(name)
+
+            if not names:
+                continue
+
+            # Infer one team for the replacement pair using existing match appearances.
+            inferred_team = None
+            for nm in names:
+                known = base_lookup.get((season, str(match_id), nm), [])
+                known_in_candidates = [k for k in known if k in candidates]
+                if len(known_in_candidates) == 1:
+                    inferred_team = known_in_candidates[0]
+                    break
+
+            # Fall back to batting_team if unresolved; this may still miss some bowling-side subs,
+            # but resolved cases cover most practical mismatches when players also appear elsewhere.
+            if inferred_team is None:
+                inferred_team = candidates[0] if candidates else ""
+
+            if not inferred_team or inferred_team.lower() in invalid:
+                continue
+
+            for nm in names:
+                repl_rows.append(
+                    {
+                        "season": season,
+                        "match_id": str(match_id),
+                        "match_date": getattr(row, "match_date"),
+                        "franchise": inferred_team,
+                        "player": nm,
+                    }
+                )
+
+        if repl_rows:
+            repl_players = pd.DataFrame(repl_rows)
+            players = pd.concat([players, repl_players], ignore_index=True)
+            players["player"] = players["player"].astype(str).str.strip()
+            players["franchise"] = players["franchise"].astype(str).str.strip()
+            players = players[~players["player"].str.lower().isin(invalid)].copy()
+            players = players[~players["franchise"].str.lower().isin(invalid)].copy()
+            players = players.drop_duplicates(subset=["season", "match_id", "franchise", "player"]).reset_index(drop=True)
+
+    return players.reset_index(drop=True)
+
+
+@st.cache_data(show_spinner=False)
+def franchise_squad_consistency_summary(all_df: pd.DataFrame, focus_years: tuple[int, ...]) -> dict[str, pd.DataFrame]:
+    players = franchise_player_participation(all_df)
+    empty = pd.DataFrame()
+    if players.empty:
+        return {"yearly": empty, "combined": empty}
+
+    min_year = min(focus_years)
+    max_year = max(focus_years)
+    players = players[players["season"].between(min_year - 1, max_year)].copy()
+
+    match_key = players[["season", "franchise", "match_id", "match_date"]].drop_duplicates().copy()
+    match_key["match_id_num"] = pd.to_numeric(match_key["match_id"], errors="coerce")
+    ordered = match_key.sort_values(
+        ["season", "franchise", "match_date", "match_id_num", "match_id"],
+        ascending=[True, True, True, True, True],
+        na_position="last",
+    )
+    first_matches = (
+        ordered.groupby(["season", "franchise"], as_index=False).first()[["season", "franchise", "match_id"]]
+        .rename(columns={"match_id": "first_match_id"})
+    )
+    last_matches = (
+        ordered.groupby(["season", "franchise"], as_index=False).last()[["season", "franchise", "match_id"]]
+        .rename(columns={"match_id": "last_match_id"})
+    )
+
+    games = (
+        players.groupby(["season", "franchise", "player"], as_index=False)["match_id"]
+        .nunique()
+        .rename(columns={"match_id": "matches_played"})
+    )
+
+    yearly_parts: list[pd.DataFrame] = []
+    available_all_years = set(players["season"].unique().tolist())
+    for year in focus_years:
+        yg = games[games["season"] == year].copy()
+        if yg.empty:
+            continue
+        y_ten_plus_list = (
+            yg[yg["matches_played"] >= 10]
+            .groupby("franchise")["player"]
+            .apply(lambda s: ", ".join(sorted(set(s))))
+            .reset_index(name="Players with 10+ Games (List)")
+        )
+        y_summary = (
+            yg.groupby("franchise", as_index=False)
+            .agg(
+                players_played=("player", "nunique"),
+                players_10plus_games=("matches_played", lambda s: int((s >= 10).sum())),
+            )
+        )
+        y_summary = y_summary.merge(y_ten_plus_list, on="franchise", how="left")
+        y_summary["Players with 10+ Games (List)"] = (
+            y_summary["Players with 10+ Games (List)"].fillna("")
+        )
+        y_summary["season"] = year
+        retained_col = "Prev Season First-Game Players in Current Season Last Game"
+        y_summary[retained_col] = 0
+        prev_year = year - 1
+        if prev_year in available_all_years:
+            pf = first_matches[first_matches["season"] == prev_year][["franchise", "first_match_id"]]
+            cl = last_matches[last_matches["season"] == year][["franchise", "last_match_id"]]
+            pf_players = (
+                players.merge(pf, left_on=["franchise", "match_id"], right_on=["franchise", "first_match_id"])
+                [["franchise", "player"]]
+                .drop_duplicates()
+            )
+            cl_players = (
+                players.merge(cl, left_on=["franchise", "match_id"], right_on=["franchise", "last_match_id"])
+                [["franchise", "player"]]
+                .drop_duplicates()
+            )
+            retained = (
+                pf_players.merge(cl_players, on=["franchise", "player"])
+                .groupby("franchise", as_index=False)
+                .size()
+                .rename(columns={"size": retained_col})
+            )
+            y_summary = y_summary.drop(columns=[retained_col]).merge(retained, on="franchise", how="left")
+            y_summary[retained_col] = y_summary[retained_col].fillna(0).astype(int)
+        yearly_parts.append(y_summary)
+
+    yearly = pd.concat(yearly_parts, ignore_index=True) if yearly_parts else empty
+    if not yearly.empty:
+        yearly = yearly.sort_values(["season", "franchise"]).reset_index(drop=True)
+
+    fy = tuple(focus_years)
+    focus_players = players[players["season"].isin(fy)].copy()
+    combined = (
+        focus_players.groupby("franchise", as_index=False)
+        .agg(players_played_2023_2025=("player", "nunique"))
+        .sort_values("franchise")
+        .reset_index(drop=True)
+    )
+
+    focus_games = games[games["season"].isin(fy)].copy()
+    per_player = (
+        focus_games.groupby(["franchise", "player"], as_index=False)
+        .agg(seasons_present=("season", "nunique"), min_games=("matches_played", "min"))
+    )
+    per_player = per_player[(per_player["seasons_present"] == len(fy)) & (per_player["min_games"] >= 10)].copy()
+    per_player_summary = (
+        per_player.groupby("franchise", as_index=False)
+        .size()
+        .rename(columns={"size": "players_10plus_games_each_season"})
+    )
+    per_player_list = (
+        per_player.groupby("franchise")["player"]
+        .apply(lambda s: ", ".join(sorted(set(s))))
+        .reset_index(name="Players with 10+ Games in Each Season (List)")
+    )
+    combined = combined.merge(per_player_summary, on="franchise", how="left")
+    combined = combined.merge(per_player_list, on="franchise", how="left")
+    combined["players_10plus_games_each_season"] = (
+        combined["players_10plus_games_each_season"].fillna(0).astype(int)
+    )
+    combined["Players with 10+ Games in Each Season (List)"] = (
+        combined["Players with 10+ Games in Each Season (List)"].fillna("")
+    )
+
+    f2023 = first_matches[first_matches["season"] == min_year][["franchise", "first_match_id"]]
+    l2025 = last_matches[last_matches["season"] == max_year][["franchise", "last_match_id"]]
+    f2023_players = (
+        players.merge(f2023, left_on=["franchise", "match_id"], right_on=["franchise", "first_match_id"])
+        [["franchise", "player"]]
+        .drop_duplicates()
+    )
+    l2025_players = (
+        players.merge(l2025, left_on=["franchise", "match_id"], right_on=["franchise", "last_match_id"])
+        [["franchise", "player"]]
+        .drop_duplicates()
+    )
+    continuity = (
+        f2023_players.merge(l2025_players, on=["franchise", "player"])
+        .groupby("franchise", as_index=False)
+        .size()
+        .rename(columns={"size": "Played First Game 2023 and Last Game 2025"})
+    )
+    combined = combined.merge(continuity, on="franchise", how="left")
+    combined["Played First Game 2023 and Last Game 2025"] = (
+        combined["Played First Game 2023 and Last Game 2025"].fillna(0).astype(int)
+    )
+
+    return {"yearly": yearly, "combined": combined}
+
+
+@st.cache_data(show_spinner=False)
+def venue_innings_averages(df: pd.DataFrame) -> pd.DataFrame:
+    if "venue" not in df.columns or "match_id" not in df.columns or "innings_id" not in df.columns:
+        return pd.DataFrame()
+
+    innings_df = df.dropna(subset=["innings_id"]).copy()
+    innings_df["match_id"] = innings_df["match_id"].astype(str).str.extract(r"(\d+)", expand=False)
+    innings_df = innings_df.dropna(subset=["match_id"]).copy()
+    innings_df["innings_id"] = pd.to_numeric(innings_df["innings_id"], errors="coerce")
+    innings_df = innings_df[innings_df["innings_id"].isin([1, 2])].copy()
+    if innings_df.empty:
+        return pd.DataFrame()
+
+    innings_df["is_boundary"] = innings_df["runs"].isin([4, 6]).astype(int)
+
+    innings_totals = (
+        innings_df.groupby(["venue", "city", "match_id", "innings_id"], as_index=False)
+        .agg(
+            innings_total=("total_runs", "sum"),
+            boundaries=("is_boundary", "sum"),
+        )
+    )
+
+    venue_avg = (
+        innings_totals.groupby(["venue", "city", "innings_id"], as_index=False)
+        .agg(
+            innings_count=("match_id", "count"),
+            avg_total_score=("innings_total", "mean"),
+            avg_boundaries=("boundaries", "mean"),
+        )
+    )
+
+    pivot = venue_avg.pivot(index=["venue", "city"], columns="innings_id")
+    pivot.columns = [f"{metric}_inn{int(inn)}" for metric, inn in pivot.columns]
+    pivot = pivot.reset_index()
+
+    for col in [
+        "innings_count_inn1",
+        "innings_count_inn2",
+        "avg_total_score_inn1",
+        "avg_total_score_inn2",
+        "avg_boundaries_inn1",
+        "avg_boundaries_inn2",
+    ]:
+        if col not in pivot.columns:
+            pivot[col] = pd.NA
+
+    for col in ["avg_total_score_inn1", "avg_total_score_inn2", "avg_boundaries_inn1", "avg_boundaries_inn2"]:
+        pivot[col] = pd.to_numeric(pivot[col], errors="coerce").round(2)
+
+    return pivot.sort_values(
+        ["avg_total_score_inn1", "venue"], ascending=[False, True], na_position="last"
+    ).reset_index(drop=True)
+
+
+def _add_venue_score_trend_columns(
+    current_df: pd.DataFrame,
+    reference_df: pd.DataFrame,
+    *,
+    first_col_name: str,
+    second_col_name: str,
+) -> pd.DataFrame:
+    if current_df.empty:
+        return current_df.copy()
+
+    result = current_df.copy()
+    result[first_col_name] = pd.NA
+    result[second_col_name] = pd.NA
+
+    if reference_df.empty:
+        return result
+
+    join_cols = ["venue", "city"]
+    ref = reference_df[
+        [*join_cols, "avg_total_score_inn1", "avg_total_score_inn2"]
+    ].rename(
+        columns={
+            "avg_total_score_inn1": "ref_avg_total_score_inn1",
+            "avg_total_score_inn2": "ref_avg_total_score_inn2",
+        }
+    )
+    merged = result.merge(ref, on=join_cols, how="left")
+
+    delta1 = merged["avg_total_score_inn1"] - merged["ref_avg_total_score_inn1"]
+    delta2 = merged["avg_total_score_inn2"] - merged["ref_avg_total_score_inn2"]
+    merged[first_col_name] = delta1.round(2)
+    merged[second_col_name] = delta2.round(2)
+
+    return merged.drop(columns=["ref_avg_total_score_inn1", "ref_avg_total_score_inn2"])
+
+
+@st.cache_data(show_spinner=False)
+def scope_milestone_summary(df: pd.DataFrame) -> dict[str, int]:
+    if "match_id" not in df.columns or "innings_id" not in df.columns:
+        return {
+            "50_plus_scores": 0,
+            "100_plus_scores": 0,
+            "two_plus_wicket_hauls": 0,
+            "four_plus_wicket_hauls": 0,
+        }
+
+    innings_df = df.dropna(subset=["innings_id"]).copy()
+    innings_df["match_id"] = innings_df["match_id"].astype(str).str.extract(r"(\d+)", expand=False)
+    innings_df = innings_df.dropna(subset=["match_id"]).copy()
+    innings_df["is_bowler_wicket"] = innings_df["wicket_kind"].isin(BOWLER_WICKET_KINDS).astype(int)
+
+    batter_innings = (
+        innings_df.groupby(["batter", "match_id", "innings_id"], as_index=False)
+        .agg(innings_runs=("runs", "sum"))
+    )
+    bowler_innings = (
+        innings_df.groupby(["bowler", "match_id", "innings_id"], as_index=False)
+        .agg(wickets=("is_bowler_wicket", "sum"))
+    )
+
+    return {
+        "50_plus_scores": int((batter_innings["innings_runs"] >= 50).sum()) if not batter_innings.empty else 0,
+        "100_plus_scores": int((batter_innings["innings_runs"] >= 100).sum()) if not batter_innings.empty else 0,
+        "two_plus_wicket_hauls": int((bowler_innings["wickets"] >= 2).sum()) if not bowler_innings.empty else 0,
+        "four_plus_wicket_hauls": int((bowler_innings["wickets"] >= 4).sum()) if not bowler_innings.empty else 0,
+    }
+
+
 def render_main_leaderboards(focus_df: pd.DataFrame, available_years: list[int]) -> None:
     st.subheader("Top 20 Runs and Wickets")
     season_scope = st.radio(
@@ -921,6 +1474,92 @@ def render_bowler_2w_leaderboards(focus_df: pd.DataFrame, available_years: list[
     with scope_tabs[-1]:
         summary_table = top_bowler_2w_innings_pct(focus_df, min_matches=18)
         render_bowler_2w_table(summary_table, "Seasons 2023-2025")
+
+
+def render_venue_summary_tab(focus_df: pd.DataFrame, available_years: list[int]) -> None:
+    st.subheader("Venue Scoring & Milestone Summary")
+    st.caption(
+        "Venue table shows average total scores and average boundaries (4s+6s) separately "
+        "for 1st and 2nd innings. Metrics summarize milestone counts for the selected scope."
+    )
+
+    scope_tabs = st.tabs([str(y) for y in available_years] + ["2023-2025 Combined"])
+
+    for idx, year in enumerate(available_years):
+        with scope_tabs[idx]:
+            scoped_df = focus_df[focus_df["season"] == year].copy()
+            prev_year_df = (
+                focus_df[focus_df["season"] == year - 1].copy()
+                if (year - 1) in available_years
+                else pd.DataFrame()
+            )
+            render_venue_and_milestones(
+                scoped_df,
+                f"Season {year}",
+                trend_reference_df=prev_year_df,
+                trend_label_first="1st Inns Trend vs Prev Year",
+                trend_label_second="2nd Inns Trend vs Prev Year",
+            )
+
+    with scope_tabs[-1]:
+        start_year_df = focus_df[focus_df["season"] == 2023].copy()
+        end_year_df = focus_df[focus_df["season"] == 2025].copy()
+        render_venue_and_milestones(
+            focus_df,
+            "Seasons 2023-2025",
+            trend_reference_df=start_year_df,
+            trend_compare_df=end_year_df,
+            trend_label_first="1st Inns Trend (2025 vs 2023)",
+            trend_label_second="2nd Inns Trend (2025 vs 2023)",
+        )
+
+
+def render_franchise_squad_consistency_tab(raw_df: pd.DataFrame, available_years: list[int]) -> None:
+    st.subheader("Franchise Squad Consistency")
+    st.caption(
+        "Franchise-wise squad selection summary based on inferred player participation "
+        "from ball-by-ball data (batter, non-striker, bowler appearances)."
+    )
+
+    summary = franchise_squad_consistency_summary(raw_df, tuple(FOCUS_YEARS))
+    yearly = summary["yearly"]
+    combined = summary["combined"]
+    scope_tabs = st.tabs([str(y) for y in available_years] + ["2023-2025 Combined"])
+
+    for idx, year in enumerate(available_years):
+        with scope_tabs[idx]:
+            year_df = yearly[yearly["season"] == year].copy() if not yearly.empty else pd.DataFrame()
+            if year_df.empty:
+                st.warning(f"No franchise consistency summary available for {year}.")
+                continue
+            display_df = (
+                year_df.drop(columns=["season"])
+                .rename(
+                    columns={
+                        "franchise": "Franchise",
+                        "players_played": "Players Used",
+                        "players_10plus_games": "Players with 10+ Games",
+                        "Players with 10+ Games (List)": "Players with 10+ Games (List)",
+                    }
+                )
+                .sort_values(["Players Used", "Franchise"], ascending=[True, True])
+                .reset_index(drop=True)
+            )
+            st.dataframe(display_df, use_container_width=True, hide_index=True)
+
+    with scope_tabs[-1]:
+        if combined.empty:
+            st.warning("No consolidated franchise consistency summary available for 2023-2025.")
+        else:
+            display_df = combined.rename(
+                columns={
+                    "franchise": "Franchise",
+                    "players_played_2023_2025": "Players Used (2023-2025)",
+                    "players_10plus_games_each_season": "Players with 10+ Games in Each Season",
+                    "Players with 10+ Games in Each Season (List)": "Players with 10+ Games in Each Season (List)",
+                }
+            ).sort_values(["Players Used (2023-2025)", "Franchise"], ascending=[True, True]).reset_index(drop=True)
+            st.dataframe(display_df, use_container_width=True, hide_index=True)
 
 
 def render_phase_tables(phase_table: pd.DataFrame, title_prefix: str) -> None:
@@ -1186,6 +1825,58 @@ def render_bowler_2w_table(summary_table: pd.DataFrame, title_prefix: str) -> No
     st.dataframe(display_df, use_container_width=True, hide_index=True)
 
 
+def render_venue_and_milestones(
+    scoped_df: pd.DataFrame,
+    title_prefix: str,
+    *,
+    trend_reference_df: pd.DataFrame | None = None,
+    trend_compare_df: pd.DataFrame | None = None,
+    trend_label_first: str | None = None,
+    trend_label_second: str | None = None,
+) -> None:
+    metrics = scope_milestone_summary(scoped_df)
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("50+ Scores", f"{metrics['50_plus_scores']:,}")
+    m2.metric("100+ Scores", f"{metrics['100_plus_scores']:,}")
+    m3.metric("2+ Wkt Hauls", f"{metrics['two_plus_wicket_hauls']:,}")
+    m4.metric("4+ Wkt Hauls", f"{metrics['four_plus_wicket_hauls']:,}")
+
+    venue_df = venue_innings_averages(scoped_df)
+    if venue_df.empty:
+        st.warning(f"No venue summary data available for {title_prefix}.")
+        return
+
+    if trend_reference_df is not None and trend_label_first and trend_label_second:
+        compare_df = scoped_df if trend_compare_df is None else trend_compare_df
+        compare_venue_df = venue_innings_averages(compare_df)
+        reference_venue_df = venue_innings_averages(trend_reference_df)
+        trend_df = _add_venue_score_trend_columns(
+            compare_venue_df,
+            reference_venue_df,
+            first_col_name=trend_label_first,
+            second_col_name=trend_label_second,
+        )
+        venue_df = venue_df.merge(
+            trend_df[["venue", "city", trend_label_first, trend_label_second]],
+            on=["venue", "city"],
+            how="left",
+        )
+
+    display_df = venue_df.rename(
+        columns={
+            "venue": "Venue",
+            "city": "City",
+            "innings_count_inn1": "1st Innings Samples",
+            "avg_total_score_inn1": "Avg 1st Inns Score",
+            "avg_boundaries_inn1": "Avg 1st Inns Boundaries",
+            "innings_count_inn2": "2nd Innings Samples",
+            "avg_total_score_inn2": "Avg 2nd Inns Score",
+            "avg_boundaries_inn2": "Avg 2nd Inns Boundaries",
+        }
+    )
+    st.dataframe(display_df, use_container_width=True, hide_index=True)
+
+
 st.title("IPL Dashboards (2023-2025)")
 st.caption("Built from ball-by-ball IPL data.")
 
@@ -1222,7 +1913,7 @@ if focus_df.empty:
     st.warning("No data available in seasons 2023-2025.")
     st.stop()
 
-main_tab, phase_runs_tab, phase_wickets_tab, batter_impact_tab, bowling_impact_tab, batter_summary_tab, dot_ball_tab, boundary_impact_tab, bowling_avg_tab, batter_variance_tab, batter_30plus_tab, bowler_2w_tab = st.tabs(
+main_tab, phase_runs_tab, phase_wickets_tab, batter_impact_tab, bowling_impact_tab, batter_summary_tab, dot_ball_tab, boundary_impact_tab, bowling_avg_tab, batter_variance_tab, batter_30plus_tab, bowler_2w_tab, venue_summary_tab, franchise_consistency_tab = st.tabs(
     [
         "Runs & Wickets",
         "Phase-wise Runs",
@@ -1236,6 +1927,8 @@ main_tab, phase_runs_tab, phase_wickets_tab, batter_impact_tab, bowling_impact_t
         "Batting Variance",
         "30+ Scores",
         "2+ Wkts %",
+        "Venue Summary",
+        "Franchise Consistency",
     ]
 )
 
@@ -1274,3 +1967,9 @@ with batter_30plus_tab:
 
 with bowler_2w_tab:
     render_bowler_2w_leaderboards(focus_df, available_years)
+
+with venue_summary_tab:
+    render_venue_summary_tab(focus_df, available_years)
+
+with franchise_consistency_tab:
+    render_franchise_squad_consistency_tab(raw_df, available_years)
