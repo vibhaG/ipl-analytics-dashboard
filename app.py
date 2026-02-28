@@ -4,12 +4,14 @@ import ast
 import re
 from pathlib import Path
 
+BASE_DIR = Path(__file__).resolve().parent
+
 import pandas as pd
 import streamlit as st
 
 st.set_page_config(page_title="IPL 2023-2025 Dashboards", layout="wide")
 
-DEFAULT_DATA_PATH = Path("/Users/vibhagopal/Downloads/ipl_data_full.csv")
+DEFAULT_DATA_PATH = BASE_DIR / "data" / "ipl_data_full.csv"
 FOCUS_YEARS = [2023, 2024, 2025]
 TOP_N = 20
 PHASE_ORDER = ["Overs 1-6", "Overs 7-14", "Overs 15-20"]
