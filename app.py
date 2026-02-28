@@ -22,6 +22,48 @@ BOWLER_WICKET_KINDS = {
     "hit wicket",
 }
 
+HOME_VENUES_BY_FRANCHISE = {
+    "Chennai Super Kings": {
+        "MA Chidambaram Stadium",
+    },
+    "Mumbai Indians": {
+        "Wankhede Stadium",
+    },
+    "Kolkata Knight Riders": {
+        "Eden Gardens",
+    },
+    "Royal Challengers Bengaluru": {
+        "M Chinnaswamy Stadium",
+    },
+    "Sunrisers Hyderabad": {
+        "Rajiv Gandhi International Stadium",
+    },
+    "Gujarat Titans": {
+        "Narendra Modi Stadium",
+    },
+    "Lucknow Super Giants": {
+        "Bharat Ratna Shri Atal Bihari Vajpayee Ekana Cricket Stadium",
+    },
+    "Delhi Capitals": {
+        "Arun Jaitley Stadium",
+        "Dr. Y.S. Rajasekhara Reddy ACA-VDCA Cricket Stadium",
+    },
+    "Rajasthan Royals": {
+        "Sawai Mansingh Stadium",
+        "Barsapara Cricket Stadium",
+    },
+    "Punjab Kings": {
+        "Maharaja Yadavindra Singh International Cricket Stadium",
+        "Himachal Pradesh Cricket Association Stadium",
+        "Punjab Cricket Association IS Bindra Stadium",
+    },
+}
+
+PLAYER_DISPLAY_OVERRIDES = {
+    "SS Iyer": "Shreyas Iyer",
+    "JC Buttler": "Jos Buttler",
+}
+
 
 @st.cache_data(show_spinner=False)
 def load_ipl_data(data_path: str) -> pd.DataFrame:
@@ -1225,6 +1267,440 @@ def top_batters_by_venue(df: pd.DataFrame, min_innings_at_venue: int) -> pd.Data
     ].sort_values(["venue", "rank_in_venue"]).reset_index(drop=True)
 
 
+@st.cache_data(show_spinner=False)
+def home_batting_leaders(df: pd.DataFrame) -> pd.DataFrame:
+    required = {"batting_team", "venue", "batter", "runs"}
+    if not required.issubset(df.columns):
+        return pd.DataFrame()
+
+    home_rows = df[
+        df.apply(
+            lambda r: r["venue"] in HOME_VENUES_BY_FRANCHISE.get(r["batting_team"], set()),
+            axis=1,
+        )
+    ].copy()
+    if home_rows.empty:
+        return pd.DataFrame()
+
+    player_runs_sf = (
+        home_rows.groupby(["season", "batting_team", "batter"], as_index=False)["runs"]
+        .sum()
+        .rename(columns={"batting_team": "franchise", "batter": "player", "runs": "home_runs"})
+    )
+    team_runs_sf = (
+        home_rows.groupby(["season", "batting_team"], as_index=False)["runs"]
+        .sum()
+        .rename(columns={"batting_team": "franchise", "runs": "franchise_home_runs"})
+    )
+
+    # Denominator must be only for franchise-seasons where the player actually belonged to that franchise.
+    participation = franchise_player_participation(df)
+    player_franchise_seasons = participation[["season", "franchise", "player"]].drop_duplicates()
+    denom = (
+        player_franchise_seasons.merge(team_runs_sf, on=["season", "franchise"], how="left")
+        .groupby("player", as_index=False)["franchise_home_runs"]
+        .sum()
+    )
+
+    detail = (
+        player_runs_sf.groupby(["franchise", "player"], as_index=False)["home_runs"]
+        .sum()
+    )
+    detail["franchise_detail"] = detail.apply(
+        lambda r: f"{r['franchise']} ({int(r['home_runs'])})", axis=1
+    )
+    out = detail.groupby("player", as_index=False).agg(
+        home_runs=("home_runs", "sum"),
+        franchise_breakdown=("franchise_detail", lambda s: ", ".join(sorted(set(s)))),
+    )
+    out = out.merge(denom, on="player", how="left")
+    out["franchise_home_runs"] = pd.to_numeric(out["franchise_home_runs"], errors="coerce").fillna(0)
+    out = out[out["franchise_home_runs"] > 0].copy()
+    out["pct_of_franchise_home_runs"] = (out["home_runs"] / out["franchise_home_runs"]) * 100
+    out["player_display"] = out["player"].map(PLAYER_DISPLAY_OVERRIDES).fillna(out["player"])
+    out = (
+        out.sort_values(
+            ["home_runs", "pct_of_franchise_home_runs", "player_display"],
+            ascending=[False, False, True],
+        )
+        .head(TOP_N)
+        .reset_index(drop=True)
+    )
+    out["rank"] = out.index + 1
+    out["pct_of_franchise_home_runs"] = out["pct_of_franchise_home_runs"].round(2)
+    return out[
+        [
+            "rank",
+            "player_display",
+            "franchise_breakdown",
+            "home_runs",
+            "franchise_home_runs",
+            "pct_of_franchise_home_runs",
+        ]
+    ]
+
+
+@st.cache_data(show_spinner=False)
+def home_bowling_leaders(df: pd.DataFrame) -> pd.DataFrame:
+    required = {"bowling_team", "venue", "bowler", "wicket_kind"}
+    if not required.issubset(df.columns):
+        return pd.DataFrame()
+
+    home_rows = df[
+        df.apply(
+            lambda r: r["venue"] in HOME_VENUES_BY_FRANCHISE.get(r["bowling_team"], set()),
+            axis=1,
+        )
+    ].copy()
+    if home_rows.empty:
+        return pd.DataFrame()
+
+    home_rows["is_bowler_wicket"] = home_rows["wicket_kind"].isin(BOWLER_WICKET_KINDS).astype(int)
+    player_wkts_sf = (
+        home_rows.groupby(["season", "bowling_team", "bowler"], as_index=False)["is_bowler_wicket"]
+        .sum()
+        .rename(columns={"bowling_team": "franchise", "bowler": "player", "is_bowler_wicket": "home_wickets"})
+    )
+    team_wkts_sf = (
+        home_rows.groupby(["season", "bowling_team"], as_index=False)["is_bowler_wicket"]
+        .sum()
+        .rename(columns={"bowling_team": "franchise", "is_bowler_wicket": "franchise_home_wickets"})
+    )
+
+    participation = franchise_player_participation(df)
+    player_franchise_seasons = participation[["season", "franchise", "player"]].drop_duplicates()
+    denom = (
+        player_franchise_seasons.merge(team_wkts_sf, on=["season", "franchise"], how="left")
+        .groupby("player", as_index=False)["franchise_home_wickets"]
+        .sum()
+    )
+
+    detail = (
+        player_wkts_sf.groupby(["franchise", "player"], as_index=False)["home_wickets"]
+        .sum()
+    )
+    detail = detail[detail["home_wickets"] > 0].copy()
+    detail["franchise_detail"] = detail.apply(
+        lambda r: f"{r['franchise']} ({int(r['home_wickets'])})", axis=1
+    )
+    out = detail.groupby("player", as_index=False).agg(
+        home_wickets=("home_wickets", "sum"),
+        franchise_breakdown=("franchise_detail", lambda s: ", ".join(sorted(set(s)))),
+    )
+    out = out.merge(denom, on="player", how="left")
+    out["franchise_home_wickets"] = pd.to_numeric(out["franchise_home_wickets"], errors="coerce").fillna(0)
+    out = out[out["franchise_home_wickets"] > 0].copy()
+    out["pct_of_franchise_home_wickets"] = (out["home_wickets"] / out["franchise_home_wickets"]) * 100
+    out["player_display"] = out["player"].map(PLAYER_DISPLAY_OVERRIDES).fillna(out["player"])
+    out = (
+        out.sort_values(
+            ["home_wickets", "pct_of_franchise_home_wickets", "player_display"],
+            ascending=[False, False, True],
+        )
+        .head(TOP_N)
+        .reset_index(drop=True)
+    )
+    out["rank"] = out.index + 1
+    out["pct_of_franchise_home_wickets"] = out["pct_of_franchise_home_wickets"].round(2)
+    return out[
+        [
+            "rank",
+            "player_display",
+            "franchise_breakdown",
+            "home_wickets",
+            "franchise_home_wickets",
+            "pct_of_franchise_home_wickets",
+        ]
+    ]
+
+
+@st.cache_data(show_spinner=False)
+def away_batting_leaders(df: pd.DataFrame) -> pd.DataFrame:
+    required = {"batting_team", "venue", "batter", "runs", "season"}
+    if not required.issubset(df.columns):
+        return pd.DataFrame()
+
+    away_rows = df[
+        df.apply(
+            lambda r: r["venue"] not in HOME_VENUES_BY_FRANCHISE.get(r["batting_team"], set()),
+            axis=1,
+        )
+    ].copy()
+    if away_rows.empty:
+        return pd.DataFrame()
+
+    player_runs_sf = (
+        away_rows.groupby(["season", "batting_team", "batter"], as_index=False)["runs"]
+        .sum()
+        .rename(columns={"batting_team": "franchise", "batter": "player", "runs": "away_runs"})
+    )
+    team_runs_sf = (
+        away_rows.groupby(["season", "batting_team"], as_index=False)["runs"]
+        .sum()
+        .rename(columns={"batting_team": "franchise", "runs": "franchise_away_runs"})
+    )
+
+    participation = franchise_player_participation(df)
+    player_franchise_seasons = participation[["season", "franchise", "player"]].drop_duplicates()
+    denom = (
+        player_franchise_seasons.merge(team_runs_sf, on=["season", "franchise"], how="left")
+        .groupby("player", as_index=False)["franchise_away_runs"]
+        .sum()
+    )
+
+    detail = (
+        player_runs_sf.groupby(["franchise", "player"], as_index=False)["away_runs"]
+        .sum()
+    )
+    detail["franchise_detail"] = detail.apply(
+        lambda r: f"{r['franchise']} ({int(r['away_runs'])})", axis=1
+    )
+    out = detail.groupby("player", as_index=False).agg(
+        away_runs=("away_runs", "sum"),
+        franchise_breakdown=("franchise_detail", lambda s: ", ".join(sorted(set(s)))),
+    )
+    out = out.merge(denom, on="player", how="left")
+    out["franchise_away_runs"] = pd.to_numeric(out["franchise_away_runs"], errors="coerce").fillna(0)
+    out = out[out["franchise_away_runs"] > 0].copy()
+    out["pct_of_franchise_away_runs"] = (out["away_runs"] / out["franchise_away_runs"]) * 100
+    out["player_display"] = out["player"].map(PLAYER_DISPLAY_OVERRIDES).fillna(out["player"])
+    out = (
+        out.sort_values(
+            ["away_runs", "pct_of_franchise_away_runs", "player_display"],
+            ascending=[False, False, True],
+        )
+        .head(TOP_N)
+        .reset_index(drop=True)
+    )
+    out["rank"] = out.index + 1
+    out["pct_of_franchise_away_runs"] = out["pct_of_franchise_away_runs"].round(2)
+    return out[
+        [
+            "rank",
+            "player_display",
+            "franchise_breakdown",
+            "away_runs",
+            "franchise_away_runs",
+            "pct_of_franchise_away_runs",
+        ]
+    ]
+
+
+@st.cache_data(show_spinner=False)
+def away_bowling_leaders(df: pd.DataFrame) -> pd.DataFrame:
+    required = {"bowling_team", "venue", "bowler", "wicket_kind", "season"}
+    if not required.issubset(df.columns):
+        return pd.DataFrame()
+
+    away_rows = df[
+        df.apply(
+            lambda r: r["venue"] not in HOME_VENUES_BY_FRANCHISE.get(r["bowling_team"], set()),
+            axis=1,
+        )
+    ].copy()
+    if away_rows.empty:
+        return pd.DataFrame()
+
+    away_rows["is_bowler_wicket"] = away_rows["wicket_kind"].isin(BOWLER_WICKET_KINDS).astype(int)
+    player_wkts_sf = (
+        away_rows.groupby(["season", "bowling_team", "bowler"], as_index=False)["is_bowler_wicket"]
+        .sum()
+        .rename(columns={"bowling_team": "franchise", "bowler": "player", "is_bowler_wicket": "away_wickets"})
+    )
+    team_wkts_sf = (
+        away_rows.groupby(["season", "bowling_team"], as_index=False)["is_bowler_wicket"]
+        .sum()
+        .rename(columns={"bowling_team": "franchise", "is_bowler_wicket": "franchise_away_wickets"})
+    )
+
+    participation = franchise_player_participation(df)
+    player_franchise_seasons = participation[["season", "franchise", "player"]].drop_duplicates()
+    denom = (
+        player_franchise_seasons.merge(team_wkts_sf, on=["season", "franchise"], how="left")
+        .groupby("player", as_index=False)["franchise_away_wickets"]
+        .sum()
+    )
+
+    detail = (
+        player_wkts_sf.groupby(["franchise", "player"], as_index=False)["away_wickets"]
+        .sum()
+    )
+    detail = detail[detail["away_wickets"] > 0].copy()
+    detail["franchise_detail"] = detail.apply(
+        lambda r: f"{r['franchise']} ({int(r['away_wickets'])})", axis=1
+    )
+    out = detail.groupby("player", as_index=False).agg(
+        away_wickets=("away_wickets", "sum"),
+        franchise_breakdown=("franchise_detail", lambda s: ", ".join(sorted(set(s)))),
+    )
+    out = out.merge(denom, on="player", how="left")
+    out["franchise_away_wickets"] = pd.to_numeric(out["franchise_away_wickets"], errors="coerce").fillna(0)
+    out = out[out["franchise_away_wickets"] > 0].copy()
+    out["pct_of_franchise_away_wickets"] = (out["away_wickets"] / out["franchise_away_wickets"]) * 100
+    out["player_display"] = out["player"].map(PLAYER_DISPLAY_OVERRIDES).fillna(out["player"])
+    out = (
+        out.sort_values(
+            ["away_wickets", "pct_of_franchise_away_wickets", "player_display"],
+            ascending=[False, False, True],
+        )
+        .head(TOP_N)
+        .reset_index(drop=True)
+    )
+    out["rank"] = out.index + 1
+    out["pct_of_franchise_away_wickets"] = out["pct_of_franchise_away_wickets"].round(2)
+    return out[
+        [
+            "rank",
+            "player_display",
+            "franchise_breakdown",
+            "away_wickets",
+            "franchise_away_wickets",
+            "pct_of_franchise_away_wickets",
+        ]
+    ]
+
+
+@st.cache_data(show_spinner=False)
+def batter_home_away_variance_summary(df: pd.DataFrame) -> pd.DataFrame:
+    required = {"season", "batting_team", "venue", "batter", "runs"}
+    if not required.issubset(df.columns):
+        return pd.DataFrame()
+
+    season_runs = (
+        df.groupby(["batter", "season"], as_index=False)["runs"]
+        .sum()
+        .rename(columns={"batter": "player", "runs": "season_runs"})
+    )
+    if season_runs.empty:
+        return pd.DataFrame()
+
+    eligible = (
+        season_runs.groupby("player")["season_runs"]
+        .apply(lambda s: bool((s >= 300).all()))
+        .reset_index(name="eligible")
+    )
+    eligible_players = set(eligible[eligible["eligible"]]["player"].tolist())
+    if not eligible_players:
+        return pd.DataFrame()
+
+    work = df[df["batter"].isin(eligible_players)].copy()
+    work["is_home"] = work.apply(
+        lambda r: r["venue"] in HOME_VENUES_BY_FRANCHISE.get(r["batting_team"], set()),
+        axis=1,
+    )
+    work["home_runs_part"] = work["runs"].where(work["is_home"], 0)
+    work["away_runs_part"] = work["runs"].where(~work["is_home"], 0)
+
+    summary = (
+        work.groupby("batter", as_index=False)
+        .agg(
+            total_runs=("runs", "sum"),
+            home_runs=("home_runs_part", "sum"),
+            away_runs=("away_runs_part", "sum"),
+        )
+        .rename(columns={"batter": "player"})
+    )
+    seasons_played = (
+        season_runs[season_runs["player"].isin(eligible_players)]
+        .groupby("player", as_index=False)["season"]
+        .nunique()
+        .rename(columns={"season": "seasons_played"})
+    )
+    summary = summary.merge(seasons_played, on="player", how="left")
+    summary["variance_home_away_runs"] = (summary["home_runs"] - summary["away_runs"]).abs()
+    summary["norm_variance_home_away_runs"] = (
+        summary["variance_home_away_runs"] / summary["total_runs"].replace(0, pd.NA)
+    )
+    summary["player_display"] = summary["player"].map(PLAYER_DISPLAY_OVERRIDES).fillna(summary["player"])
+    summary["norm_variance_home_away_runs"] = pd.to_numeric(
+        summary["norm_variance_home_away_runs"], errors="coerce"
+    ).round(4)
+    return summary[
+        [
+            "player",
+            "player_display",
+            "seasons_played",
+            "total_runs",
+            "home_runs",
+            "away_runs",
+            "variance_home_away_runs",
+            "norm_variance_home_away_runs",
+        ]
+    ]
+
+
+@st.cache_data(show_spinner=False)
+def bowler_home_away_variance_summary(df: pd.DataFrame) -> pd.DataFrame:
+    required = {"season", "bowling_team", "venue", "bowler", "wicket_kind"}
+    if not required.issubset(df.columns):
+        return pd.DataFrame()
+
+    work = df.copy()
+    work["is_w"] = work["wicket_kind"].isin(BOWLER_WICKET_KINDS).astype(int)
+
+    season_wkts = (
+        work.groupby(["bowler", "season"], as_index=False)["is_w"]
+        .sum()
+        .rename(columns={"bowler": "player", "is_w": "season_wickets"})
+    )
+    if season_wkts.empty:
+        return pd.DataFrame()
+
+    eligible = (
+        season_wkts.groupby("player")["season_wickets"]
+        .apply(lambda s: bool((s >= 10).all()))
+        .reset_index(name="eligible")
+    )
+    eligible_players = set(eligible[eligible["eligible"]]["player"].tolist())
+    if not eligible_players:
+        return pd.DataFrame()
+
+    work = work[work["bowler"].isin(eligible_players)].copy()
+    work["is_home"] = work.apply(
+        lambda r: r["venue"] in HOME_VENUES_BY_FRANCHISE.get(r["bowling_team"], set()),
+        axis=1,
+    )
+    work["home_w_part"] = work["is_w"].where(work["is_home"], 0)
+    work["away_w_part"] = work["is_w"].where(~work["is_home"], 0)
+
+    summary = (
+        work.groupby("bowler", as_index=False)
+        .agg(
+            total_wickets=("is_w", "sum"),
+            home_wickets=("home_w_part", "sum"),
+            away_wickets=("away_w_part", "sum"),
+        )
+        .rename(columns={"bowler": "player"})
+    )
+    seasons_played = (
+        season_wkts[season_wkts["player"].isin(eligible_players)]
+        .groupby("player", as_index=False)["season"]
+        .nunique()
+        .rename(columns={"season": "seasons_played"})
+    )
+    summary = summary.merge(seasons_played, on="player", how="left")
+    summary["variance_home_away_wickets"] = (summary["home_wickets"] - summary["away_wickets"]).abs()
+    summary["norm_variance_home_away_wickets"] = (
+        summary["variance_home_away_wickets"] / summary["total_wickets"].replace(0, pd.NA)
+    )
+    summary["player_display"] = summary["player"].map(PLAYER_DISPLAY_OVERRIDES).fillna(summary["player"])
+    summary["norm_variance_home_away_wickets"] = pd.to_numeric(
+        summary["norm_variance_home_away_wickets"], errors="coerce"
+    ).round(4)
+    return summary[
+        [
+            "player",
+            "player_display",
+            "seasons_played",
+            "total_wickets",
+            "home_wickets",
+            "away_wickets",
+            "variance_home_away_wickets",
+            "norm_variance_home_away_wickets",
+        ]
+    ]
+
+
 def _add_venue_score_trend_columns(
     current_df: pd.DataFrame,
     reference_df: pd.DataFrame,
@@ -1651,6 +2127,58 @@ def render_best_batters_by_venue_tab(focus_df: pd.DataFrame, available_years: li
         render_best_batters_by_venue_table(table, "Seasons 2023-2025")
 
 
+def render_home_performance_tabs(focus_df: pd.DataFrame) -> None:
+    st.subheader("Home Ground Leaders (2023-2025 Combined)")
+    st.caption(
+        "Franchise-specific home venue mapping is used per match, so player transfers across seasons "
+        "are handled with their new franchise home venues."
+    )
+
+    batting = home_batting_leaders(focus_df)
+    bowling = home_bowling_leaders(focus_df)
+    left, right = st.columns(2)
+
+    with left:
+        st.markdown("### Top 20 Batters at Home")
+        if batting.empty:
+            st.warning("No eligible home batting data.")
+        else:
+            st.dataframe(
+                batting.rename(
+                    columns={
+                        "rank": "Rank",
+                        "player": "Player",
+                        "franchise": "Franchise",
+                        "home_runs": "Runs at Home",
+                        "franchise_home_runs": "Franchise Runs at Home",
+                        "pct_of_franchise_home_runs": "% of Franchise Home Runs",
+                    }
+                ),
+                use_container_width=True,
+                hide_index=True,
+            )
+
+    with right:
+        st.markdown("### Top 20 Bowlers at Home")
+        if bowling.empty:
+            st.warning("No eligible home bowling data.")
+        else:
+            st.dataframe(
+                bowling.rename(
+                    columns={
+                        "rank": "Rank",
+                        "player": "Player",
+                        "franchise": "Franchise",
+                        "home_wickets": "Wickets at Home",
+                        "franchise_home_wickets": "Franchise Wickets at Home",
+                        "pct_of_franchise_home_wickets": "% of Franchise Home Wickets",
+                    }
+                ),
+                use_container_width=True,
+                hide_index=True,
+            )
+
+
 def render_phase_tables(phase_table: pd.DataFrame, title_prefix: str) -> None:
     if phase_table.empty:
         st.warning("No phase data available for this scope.")
@@ -2023,7 +2551,7 @@ if focus_df.empty:
     st.warning("No data available in seasons 2023-2025.")
     st.stop()
 
-main_tab, phase_runs_tab, phase_wickets_tab, batter_impact_tab, bowling_impact_tab, batter_summary_tab, dot_ball_tab, boundary_impact_tab, bowling_avg_tab, batter_variance_tab, batter_30plus_tab, bowler_2w_tab, venue_summary_tab, franchise_consistency_tab, best_batters_venue_tab = st.tabs(
+main_tab, phase_runs_tab, phase_wickets_tab, batter_impact_tab, bowling_impact_tab, batter_summary_tab, dot_ball_tab, boundary_impact_tab, bowling_avg_tab, batter_variance_tab, batter_30plus_tab, bowler_2w_tab, venue_summary_tab, franchise_consistency_tab, best_batters_venue_tab, home_batting_tab, home_bowling_tab, away_batting_tab, away_bowling_tab, batter_home_away_variance_tab, bowler_home_away_variance_tab = st.tabs(
     [
         "Runs & Wickets",
         "Phase-wise Runs",
@@ -2040,6 +2568,12 @@ main_tab, phase_runs_tab, phase_wickets_tab, batter_impact_tab, bowling_impact_t
         "Venue Summary",
         "Franchise Consistency",
         "Best Batters by Venue",
+        "Home Batting Leaders",
+        "Home Bowling Leaders",
+        "Away Batting Leaders",
+        "Away Bowling Leaders",
+        "Batter H-A Variance",
+        "Bowler H-A Variance",
     ]
 )
 
@@ -2087,3 +2621,279 @@ with franchise_consistency_tab:
 
 with best_batters_venue_tab:
     render_best_batters_by_venue_tab(focus_df, available_years)
+
+with home_batting_tab:
+    st.subheader("Home Batting Leaders (2023-2025 Combined)")
+    st.caption(
+        "Top 20 batters by runs at their franchise home grounds. "
+        "Includes % contribution vs total franchise home runs."
+    )
+    batting = home_batting_leaders(focus_df)
+    if batting.empty:
+        st.warning("No eligible home batting data.")
+    else:
+        st.dataframe(
+            batting.rename(
+                columns={
+                    "rank": "Rank",
+                    "player_display": "Player",
+                    "franchise_breakdown": "Franchise Breakdown",
+                    "home_runs": "Runs at Home",
+                    "franchise_home_runs": "Franchise Runs at Home",
+                    "pct_of_franchise_home_runs": "% of Franchise Home Runs",
+                }
+            ),
+            use_container_width=True,
+            hide_index=True,
+        )
+
+with home_bowling_tab:
+    st.subheader("Home Bowling Leaders (2023-2025 Combined)")
+    st.caption(
+        "Top 20 bowlers by wickets at their franchise home grounds. "
+        "Includes % contribution vs total franchise home wickets."
+    )
+    bowling = home_bowling_leaders(focus_df)
+    if bowling.empty:
+        st.warning("No eligible home bowling data.")
+    else:
+        st.dataframe(
+            bowling.rename(
+                columns={
+                    "rank": "Rank",
+                    "player_display": "Player",
+                    "franchise_breakdown": "Franchise Breakdown",
+                    "home_wickets": "Wickets at Home",
+                    "franchise_home_wickets": "Franchise Wickets at Home",
+                    "pct_of_franchise_home_wickets": "% of Franchise Home Wickets",
+                }
+            ),
+            use_container_width=True,
+            hide_index=True,
+        )
+
+with away_batting_tab:
+    st.subheader("Away Batting Leaders (2023-2025 Combined)")
+    st.caption(
+        "Top 20 batters by runs away from home. "
+        "Includes % contribution vs total franchise away runs in seasons/franchises they played."
+    )
+    away_bat = away_batting_leaders(focus_df)
+    if away_bat.empty:
+        st.warning("No eligible away batting data.")
+    else:
+        st.dataframe(
+            away_bat.rename(
+                columns={
+                    "rank": "Rank",
+                    "player_display": "Player",
+                    "franchise_breakdown": "Franchise Breakdown",
+                    "away_runs": "Runs Away",
+                    "franchise_away_runs": "Franchise Runs Away",
+                    "pct_of_franchise_away_runs": "% of Franchise Away Runs",
+                }
+            ),
+            use_container_width=True,
+            hide_index=True,
+        )
+
+with away_bowling_tab:
+    st.subheader("Away Bowling Leaders (2023-2025 Combined)")
+    st.caption(
+        "Top 20 bowlers by wickets away from home. "
+        "Includes % contribution vs total franchise away wickets in seasons/franchises they played."
+    )
+    away_bow = away_bowling_leaders(focus_df)
+    if away_bow.empty:
+        st.warning("No eligible away bowling data.")
+    else:
+        st.dataframe(
+            away_bow.rename(
+                columns={
+                    "rank": "Rank",
+                    "player_display": "Player",
+                    "franchise_breakdown": "Franchise Breakdown",
+                    "away_wickets": "Wickets Away",
+                    "franchise_away_wickets": "Franchise Wickets Away",
+                    "pct_of_franchise_away_wickets": "% of Franchise Away Wickets",
+                }
+            ),
+            use_container_width=True,
+            hide_index=True,
+        )
+
+with batter_home_away_variance_tab:
+    st.subheader("Batter Home vs Away Variance (2023-2025 Combined)")
+    st.caption(
+        "Eligibility: minimum 300 runs in each season played during 2023-2025. "
+        "Variance metric: |home runs - away runs| / total runs."
+    )
+    bvar = batter_home_away_variance_summary(focus_df)
+    if bvar.empty:
+        st.warning("No eligible batter data for variance report.")
+    else:
+        least = (
+            bvar.sort_values(
+                ["norm_variance_home_away_runs", "total_runs", "player_display"],
+                ascending=[True, False, True],
+            )
+            .head(TOP_N)
+            .reset_index(drop=True)
+        )
+        least["rank"] = least.index + 1
+        most = (
+            bvar.sort_values(
+                ["norm_variance_home_away_runs", "total_runs", "player_display"],
+                ascending=[False, False, True],
+            )
+            .head(TOP_N)
+            .reset_index(drop=True)
+        )
+        most["rank"] = most.index + 1
+        c1, c2 = st.columns(2)
+        with c1:
+            st.markdown("### Least Variance (Top 20)")
+            st.dataframe(
+                least[
+                    [
+                        "rank",
+                        "player_display",
+                        "seasons_played",
+                        "total_runs",
+                        "home_runs",
+                        "away_runs",
+                        "variance_home_away_runs",
+                        "norm_variance_home_away_runs",
+                    ]
+                ].rename(
+                    columns={
+                        "rank": "Rank",
+                        "player_display": "Player",
+                        "seasons_played": "Seasons Played",
+                        "total_runs": "Total Runs",
+                        "home_runs": "Home Runs",
+                        "away_runs": "Away Runs",
+                        "variance_home_away_runs": "|Home-Away| Runs",
+                        "norm_variance_home_away_runs": "|H-A|/Total Runs",
+                    }
+                ),
+                use_container_width=True,
+                hide_index=True,
+            )
+        with c2:
+            st.markdown("### Most Variance (Top 20)")
+            st.dataframe(
+                most[
+                    [
+                        "rank",
+                        "player_display",
+                        "seasons_played",
+                        "total_runs",
+                        "home_runs",
+                        "away_runs",
+                        "variance_home_away_runs",
+                        "norm_variance_home_away_runs",
+                    ]
+                ].rename(
+                    columns={
+                        "rank": "Rank",
+                        "player_display": "Player",
+                        "seasons_played": "Seasons Played",
+                        "total_runs": "Total Runs",
+                        "home_runs": "Home Runs",
+                        "away_runs": "Away Runs",
+                        "variance_home_away_runs": "|Home-Away| Runs",
+                        "norm_variance_home_away_runs": "|H-A|/Total Runs",
+                    }
+                ),
+                use_container_width=True,
+                hide_index=True,
+            )
+
+with bowler_home_away_variance_tab:
+    st.subheader("Bowler Home vs Away Variance (2023-2025 Combined)")
+    st.caption(
+        "Eligibility: minimum 10 wickets in each season played during 2023-2025. "
+        "Variance metric: |home wickets - away wickets| / total wickets."
+    )
+    wvar = bowler_home_away_variance_summary(focus_df)
+    if wvar.empty:
+        st.warning("No eligible bowler data for variance report.")
+    else:
+        least = (
+            wvar.sort_values(
+                ["norm_variance_home_away_wickets", "total_wickets", "player_display"],
+                ascending=[True, False, True],
+            )
+            .head(TOP_N)
+            .reset_index(drop=True)
+        )
+        least["rank"] = least.index + 1
+        most = (
+            wvar.sort_values(
+                ["norm_variance_home_away_wickets", "total_wickets", "player_display"],
+                ascending=[False, False, True],
+            )
+            .head(TOP_N)
+            .reset_index(drop=True)
+        )
+        most["rank"] = most.index + 1
+        c1, c2 = st.columns(2)
+        with c1:
+            st.markdown("### Least Variance (Top 20)")
+            st.dataframe(
+                least[
+                    [
+                        "rank",
+                        "player_display",
+                        "seasons_played",
+                        "total_wickets",
+                        "home_wickets",
+                        "away_wickets",
+                        "variance_home_away_wickets",
+                        "norm_variance_home_away_wickets",
+                    ]
+                ].rename(
+                    columns={
+                        "rank": "Rank",
+                        "player_display": "Player",
+                        "seasons_played": "Seasons Played",
+                        "total_wickets": "Total Wickets",
+                        "home_wickets": "Home Wickets",
+                        "away_wickets": "Away Wickets",
+                        "variance_home_away_wickets": "|Home-Away| Wickets",
+                        "norm_variance_home_away_wickets": "|H-A|/Total Wkts",
+                    }
+                ),
+                use_container_width=True,
+                hide_index=True,
+            )
+        with c2:
+            st.markdown("### Most Variance (Top 20)")
+            st.dataframe(
+                most[
+                    [
+                        "rank",
+                        "player_display",
+                        "seasons_played",
+                        "total_wickets",
+                        "home_wickets",
+                        "away_wickets",
+                        "variance_home_away_wickets",
+                        "norm_variance_home_away_wickets",
+                    ]
+                ].rename(
+                    columns={
+                        "rank": "Rank",
+                        "player_display": "Player",
+                        "seasons_played": "Seasons Played",
+                        "total_wickets": "Total Wickets",
+                        "home_wickets": "Home Wickets",
+                        "away_wickets": "Away Wickets",
+                        "variance_home_away_wickets": "|Home-Away| Wickets",
+                        "norm_variance_home_away_wickets": "|H-A|/Total Wkts",
+                    }
+                ),
+                use_container_width=True,
+                hide_index=True,
+            )
