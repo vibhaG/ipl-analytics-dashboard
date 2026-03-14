@@ -2195,6 +2195,7 @@ def targeted_bowler_consolidated_ranking(df: pd.DataFrame) -> pd.DataFrame:
     summary["balls_per_wicket"] = (balls_num / wickets_num.where(wickets_num != 0)).round(2)
     summary["economy_rate"] = ((runs_num * 6) / balls_num.where(balls_num != 0)).round(2)
     summary["name"] = summary["bowler"].map(BOWLER_TARGET_DISPLAY).fillna(summary["bowler"])
+    summary = summary[summary["balls_total"] >= 100].copy()
 
     summary = summary.sort_values(["balls_per_wicket", "wickets_total", "name"], ascending=[True, False, True], na_position="last")
     return summary[["name", "matches", "balls_total", "wickets_total", "balls_per_wicket", "economy_rate"]].reset_index(drop=True)
