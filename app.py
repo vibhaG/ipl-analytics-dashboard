@@ -2176,29 +2176,33 @@ def targeted_bowler_consolidated_ranking(df: pd.DataFrame) -> pd.DataFrame:
         return pd.DataFrame(columns=["name", "matches", "balls_total", "wickets_total", "balls_per_wicket", "economy_rate"])
 
     scoped["is_bowler_wicket"] = scoped["wicket_kind"].isin(BOWLER_WICKET_KINDS).astype(int)
+    scoped["dot_ball"] = ((scoped["balls_bowled"] == 1) & (scoped["total_runs"] == 0)).astype(int)
     summary = (
         scoped.groupby("bowler", as_index=False)
         .agg(
             matches=("match_id", "nunique"),
             balls_total=("balls_bowled", "sum"),
             wickets_total=("is_bowler_wicket", "sum"),
+            dot_balls=("dot_ball", "sum"),
             runs_conceded=("total_runs", "sum"),
         )
     )
 
     summary = summary.set_index("bowler").reindex(BOWLER_TARGET_KEYS).reset_index()
-    for col in ["matches", "balls_total", "wickets_total", "runs_conceded"]:
+    for col in ["matches", "balls_total", "wickets_total", "dot_balls", "runs_conceded"]:
         summary[col] = summary[col].fillna(0)
     balls_num = pd.to_numeric(summary["balls_total"], errors="coerce")
     wickets_num = pd.to_numeric(summary["wickets_total"], errors="coerce")
     runs_num = pd.to_numeric(summary["runs_conceded"], errors="coerce")
+    dot_num = pd.to_numeric(summary["dot_balls"], errors="coerce")
     summary["balls_per_wicket"] = (balls_num / wickets_num.where(wickets_num != 0)).round(2)
+    summary["dot_ball_pct"] = ((dot_num / balls_num.where(balls_num != 0)) * 100).round(2)
     summary["economy_rate"] = ((runs_num * 6) / balls_num.where(balls_num != 0)).round(2)
     summary["name"] = summary["bowler"].map(BOWLER_TARGET_DISPLAY).fillna(summary["bowler"])
     summary = summary[summary["balls_total"] >= 100].copy()
 
     summary = summary.sort_values(["balls_per_wicket", "wickets_total", "name"], ascending=[True, False, True], na_position="last")
-    return summary[["name", "matches", "balls_total", "wickets_total", "balls_per_wicket", "economy_rate"]].reset_index(drop=True)
+    return summary[["name", "matches", "balls_total", "wickets_total", "dot_ball_pct", "balls_per_wicket", "economy_rate"]].reset_index(drop=True)
 
 
 def render_target_bowler_consolidated_tab(focus_df: pd.DataFrame) -> None:
@@ -2212,6 +2216,7 @@ def render_target_bowler_consolidated_tab(focus_df: pd.DataFrame) -> None:
                 "matches": "Matches",
                 "balls_total": "Balls Total",
                 "wickets_total": "Wickets Total",
+                "dot_ball_pct": "Dot Ball %",
                 "balls_per_wicket": "Balls/Wicket",
                 "economy_rate": "Economy",
             }
