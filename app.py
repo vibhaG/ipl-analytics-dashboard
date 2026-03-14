@@ -93,6 +93,38 @@ RAMANDEEP_BATTER_NAME = "Ramandeep Singh"
 RAMANDEEP_BATTER_LABEL = "Ramandeep Singh"
 ANIKET_BATTER_NAME = "Aniket Verma"
 ANIKET_BATTER_LABEL = "Aniket Verma"
+TODAY_BATTER_KEYS = [
+    NEHAL_BATTER_NAME,
+    NAMAN_BATTER_NAME,
+    ANGKRISH_BATTER_NAME,
+    AYUSH_BATTER_NAME,
+    DEWALD_BATTER_NAME,
+    RAJAT_BATTER_NAME,
+    DHRUV_BATTER_NAME,
+    RUTHERFORD_BATTER_NAME,
+    SHIVAM_BATTER_NAME,
+    JITESH_BATTER_NAME,
+    SHASHANK_BATTER_NAME,
+    ASHUTOSH_BATTER_NAME,
+    RAMANDEEP_BATTER_NAME,
+    ANIKET_BATTER_NAME,
+]
+TODAY_BATTER_DISPLAY = {
+    NEHAL_BATTER_NAME: NEHAL_BATTER_LABEL,
+    NAMAN_BATTER_NAME: NAMAN_BATTER_LABEL,
+    ANGKRISH_BATTER_NAME: ANGKRISH_BATTER_LABEL,
+    AYUSH_BATTER_NAME: AYUSH_BATTER_LABEL,
+    DEWALD_BATTER_NAME: DEWALD_BATTER_LABEL,
+    RAJAT_BATTER_NAME: RAJAT_BATTER_LABEL,
+    DHRUV_BATTER_NAME: DHRUV_BATTER_LABEL,
+    RUTHERFORD_BATTER_NAME: RUTHERFORD_BATTER_LABEL,
+    SHIVAM_BATTER_NAME: SHIVAM_BATTER_LABEL,
+    JITESH_BATTER_NAME: JITESH_BATTER_LABEL,
+    SHASHANK_BATTER_NAME: SHASHANK_BATTER_LABEL,
+    ASHUTOSH_BATTER_NAME: ASHUTOSH_BATTER_LABEL,
+    RAMANDEEP_BATTER_NAME: RAMANDEEP_BATTER_LABEL,
+    ANIKET_BATTER_NAME: ANIKET_BATTER_LABEL,
+}
 
 
 @st.cache_data(show_spinner=False)
@@ -1883,6 +1915,87 @@ def batter_position_and_phase_summary(df: pd.DataFrame, batter_name: str) -> tup
     phase_table["strike_rate"] = ((phase_table["runs"] / phase_table["balls"].replace(0, pd.NA)) * 100).round(2)
 
     return position_table, phase_table
+
+
+@st.cache_data(show_spinner=False)
+def today_batters_phase_sr_summary(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    required_cols = {"batter", "runs", "balls_faced", "over_number"}
+    if not required_cols.issubset(df.columns):
+        empty = pd.DataFrame(columns=["rank", "batter", "runs", "balls", "strike_rate"])
+        return empty, empty
+
+    scoped = df[df["batter"].isin(TODAY_BATTER_KEYS)].copy()
+    if scoped.empty:
+        empty = pd.DataFrame(columns=["rank", "batter", "runs", "balls", "strike_rate"])
+        return empty, empty
+
+    scoped["phase"] = pd.cut(
+        scoped["over_number"],
+        bins=[0, 6, 14, 20],
+        labels=PHASE_ORDER,
+        include_lowest=True,
+    )
+
+    grouped = (
+        scoped.dropna(subset=["phase"])
+        .groupby(["phase", "batter"], as_index=False, observed=True)
+        .agg(runs=("runs", "sum"), balls=("balls_faced", "sum"))
+    )
+
+    def _phase_table(phase_name: str) -> pd.DataFrame:
+        phase_df = grouped[grouped["phase"] == phase_name][["batter", "runs", "balls"]].copy()
+        phase_df = phase_df.set_index("batter").reindex(TODAY_BATTER_KEYS).reset_index()
+        phase_df["runs"] = phase_df["runs"].fillna(0)
+        phase_df["balls"] = phase_df["balls"].fillna(0)
+        phase_df["strike_rate"] = ((phase_df["runs"] / phase_df["balls"].replace(0, pd.NA)) * 100).round(2)
+        phase_df["batter"] = phase_df["batter"].map(TODAY_BATTER_DISPLAY).fillna(phase_df["batter"])
+        phase_df = phase_df.sort_values(["strike_rate", "runs", "balls", "batter"], ascending=[False, False, False, True], na_position="last").reset_index(drop=True)
+        phase_df["rank"] = phase_df.index + 1
+        return phase_df[["rank", "batter", "runs", "balls", "strike_rate"]]
+
+    return _phase_table("Overs 7-14"), _phase_table("Overs 15-20")
+
+
+def render_today_batters_phase_sr_tab(focus_df: pd.DataFrame) -> None:
+    st.subheader("Today Batters - Phase SR (2023-2025 Combined)")
+    st.caption(
+        "All processed batters retained. Rankings are by strike rate descending for Overs 7-14 and Overs 15-20, consolidated across 2023-2025."
+    )
+
+    phase_7_14, phase_15_20 = today_batters_phase_sr_summary(focus_df)
+    c1, c2 = st.columns(2)
+
+    with c1:
+        st.markdown("### Overs 7-14")
+        st.dataframe(
+            phase_7_14.rename(
+                columns={
+                    "rank": "Rank",
+                    "batter": "Batter",
+                    "runs": "Runs",
+                    "balls": "Balls",
+                    "strike_rate": "Strike Rate",
+                }
+            ),
+            use_container_width=True,
+            hide_index=True,
+        )
+
+    with c2:
+        st.markdown("### Overs 15-20")
+        st.dataframe(
+            phase_15_20.rename(
+                columns={
+                    "rank": "Rank",
+                    "batter": "Batter",
+                    "runs": "Runs",
+                    "balls": "Balls",
+                    "strike_rate": "Strike Rate",
+                }
+            ),
+            use_container_width=True,
+            hide_index=True,
+        )
 
 
 def render_main_leaderboards(focus_df: pd.DataFrame, available_years: list[int]) -> None:
@@ -4011,7 +4124,7 @@ if focus_df.empty:
     st.warning("No data available in seasons 2023-2025.")
     st.stop()
 
-main_tab, phase_runs_tab, phase_wickets_tab, batter_impact_tab, bowling_impact_tab, batter_summary_tab, dot_ball_tab, boundary_impact_tab, bowling_avg_tab, batter_variance_tab, batter_30plus_tab, bowler_2w_tab, venue_summary_tab, franchise_consistency_tab, best_batters_venue_tab, home_batting_tab, home_bowling_tab, away_batting_tab, away_bowling_tab, batter_home_away_variance_tab, bowler_home_away_variance_tab, nehal_summary_tab, naman_summary_tab, angkrish_summary_tab, ayush_summary_tab, dewald_summary_tab, rajat_summary_tab, dhruv_summary_tab, rutherford_summary_tab, shivam_summary_tab, jitesh_summary_tab, shashank_summary_tab, ashutosh_summary_tab, ramandeep_summary_tab, aniket_summary_tab = st.tabs(
+main_tab, phase_runs_tab, phase_wickets_tab, batter_impact_tab, bowling_impact_tab, batter_summary_tab, dot_ball_tab, boundary_impact_tab, bowling_avg_tab, batter_variance_tab, batter_30plus_tab, bowler_2w_tab, venue_summary_tab, franchise_consistency_tab, best_batters_venue_tab, home_batting_tab, home_bowling_tab, away_batting_tab, away_bowling_tab, batter_home_away_variance_tab, bowler_home_away_variance_tab, nehal_summary_tab, naman_summary_tab, angkrish_summary_tab, ayush_summary_tab, dewald_summary_tab, rajat_summary_tab, dhruv_summary_tab, rutherford_summary_tab, shivam_summary_tab, jitesh_summary_tab, shashank_summary_tab, ashutosh_summary_tab, ramandeep_summary_tab, aniket_summary_tab, today_batters_sr_tab = st.tabs(
     [
         "Runs & Wickets",
         "Phase-wise Runs",
@@ -4048,6 +4161,7 @@ main_tab, phase_runs_tab, phase_wickets_tab, batter_impact_tab, bowling_impact_t
         "Batter summary - Ashutosh",
         "Batter summary - Ramandeep",
         "Batter summary - Aniket",
+        "Today Batters 7-14/15-20 SR",
     ]
 )
 
@@ -4427,3 +4541,7 @@ with ramandeep_summary_tab:
 
 with aniket_summary_tab:
     render_aniket_batter_summary_tab(focus_df, available_years)
+
+
+with today_batters_sr_tab:
+    render_today_batters_phase_sr_tab(focus_df)
