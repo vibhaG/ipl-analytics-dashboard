@@ -65,6 +65,8 @@ PLAYER_DISPLAY_OVERRIDES = {
     "SS Iyer": "Shreyas Iyer",
     "JC Buttler": "Jos Buttler",
 }
+NEHAL_BATTER_NAME = "N Wadhera"
+NEHAL_BATTER_LABEL = "Nehal Wadhera"
 
 
 @st.cache_data(show_spinner=False)
@@ -1771,6 +1773,92 @@ def scope_milestone_summary(df: pd.DataFrame) -> dict[str, int]:
     }
 
 
+@st.cache_data(show_spinner=False)
+def batter_position_and_phase_summary(df: pd.DataFrame, batter_name: str) -> tuple[pd.DataFrame, pd.DataFrame]:
+    required_cols = {"season", "match_id", "innings_id", "batter", "runs", "balls_faced", "over_number"}
+    if not required_cols.issubset(df.columns):
+        return (
+            pd.DataFrame(columns=["position", "innings", "runs", "balls", "strike_rate"]),
+            pd.DataFrame(columns=["phase", "runs", "balls", "strike_rate"]),
+        )
+
+    scoped = df.copy().reset_index(drop=False).rename(columns={"index": "_row_order"})
+    innings_cols = ["season", "match_id", "innings_id"]
+    scoped = scoped.dropna(subset=innings_cols + ["batter"]).copy()
+    player_ball_df = scoped[scoped["batter"] == batter_name].copy()
+    if player_ball_df.empty:
+        return (
+            pd.DataFrame(columns=["position", "innings", "runs", "balls", "strike_rate"]),
+            pd.DataFrame(columns=["phase", "runs", "balls", "strike_rate"]),
+        )
+
+    batter_events = scoped[innings_cols + ["over_number", "_row_order", "batter"]].rename(
+        columns={"batter": "player"}
+    )
+    non_striker_events = scoped[innings_cols + ["over_number", "_row_order", "non_striker"]].rename(
+        columns={"non_striker": "player"}
+    )
+    events = pd.concat([batter_events, non_striker_events], ignore_index=True)
+    events["player"] = events["player"].astype(str).str.strip()
+    events = events[~events["player"].str.lower().isin({"", "nan", "none", "<na>"})].copy()
+
+    first_appearance = (
+        events.sort_values(innings_cols + ["over_number", "_row_order", "player"])
+        .drop_duplicates(innings_cols + ["player"], keep="first")
+        .copy()
+    )
+    first_appearance["position"] = first_appearance.groupby(innings_cols).cumcount() + 1
+
+    player_innings = first_appearance[first_appearance["player"] == batter_name][innings_cols + ["position"]].copy()
+    player_ball_df = player_ball_df.merge(player_innings, on=innings_cols, how="left")
+    player_ball_df = player_ball_df.dropna(subset=["position"]).copy()
+    if player_ball_df.empty:
+        return (
+            pd.DataFrame(columns=["position", "innings", "runs", "balls", "strike_rate"]),
+            pd.DataFrame(columns=["phase", "runs", "balls", "strike_rate"]),
+        )
+
+    player_ball_df["position"] = player_ball_df["position"].astype(int)
+    player_ball_df["innings_key"] = (
+        player_ball_df["season"].astype(str)
+        + "_"
+        + player_ball_df["match_id"].astype(str)
+        + "_"
+        + player_ball_df["innings_id"].astype(str)
+    )
+
+    position_table = (
+        player_ball_df.groupby("position", as_index=False)
+        .agg(
+            innings=("innings_key", "nunique"),
+            runs=("runs", "sum"),
+            balls=("balls_faced", "sum"),
+        )
+        .sort_values("position")
+        .reset_index(drop=True)
+    )
+    position_table["strike_rate"] = (
+        (position_table["runs"] / position_table["balls"].replace(0, pd.NA)) * 100
+    ).round(2)
+
+    player_ball_df["phase"] = pd.cut(
+        player_ball_df["over_number"],
+        bins=[0, 6, 14, 20],
+        labels=PHASE_ORDER,
+        include_lowest=True,
+    )
+    phase_table = (
+        player_ball_df.dropna(subset=["phase"])
+        .groupby("phase", as_index=False, observed=True)
+        .agg(runs=("runs", "sum"), balls=("balls_faced", "sum"))
+    )
+    phase_table["phase"] = pd.Categorical(phase_table["phase"], PHASE_ORDER, ordered=True)
+    phase_table = phase_table.sort_values("phase").reset_index(drop=True)
+    phase_table["strike_rate"] = ((phase_table["runs"] / phase_table["balls"].replace(0, pd.NA)) * 100).round(2)
+
+    return position_table, phase_table
+
+
 def render_main_leaderboards(focus_df: pd.DataFrame, available_years: list[int]) -> None:
     st.subheader("Top 20 Runs and Wickets")
     season_scope = st.radio(
@@ -1809,6 +1897,102 @@ def render_main_leaderboards(focus_df: pd.DataFrame, available_years: list[int])
     with right:
         st.markdown("### Top 20 Wicket Takers")
         st.dataframe(wickets_table, use_container_width=True, hide_index=True)
+
+
+def render_nehal_batter_summary_tab(focus_df: pd.DataFrame, available_years: list[int]) -> None:
+    st.subheader("Batter Summary - Nehal Wadhera")
+    st.caption(
+        "Year-wise and consolidated summary for runs and strike rate by batting position and phase "
+        "(Overs 1-6, Overs 7-14, Overs 15-20)."
+    )
+
+    scope_tabs = st.tabs([str(y) for y in available_years] + ["2023-2025 Combined"])
+
+    for idx, year in enumerate(available_years):
+        with scope_tabs[idx]:
+            scoped_df = focus_df[focus_df["season"] == year].copy()
+            position_table, phase_table = batter_position_and_phase_summary(scoped_df, NEHAL_BATTER_NAME)
+            if position_table.empty and phase_table.empty:
+                st.warning(f"No batting records found for {NEHAL_BATTER_LABEL} in {year}.")
+                continue
+            left, right = st.columns(2)
+            with left:
+                st.markdown("### Runs by Batting Position")
+                if position_table.empty:
+                    st.info("No batting-position data for this scope.")
+                else:
+                    st.dataframe(
+                        position_table.rename(
+                            columns={
+                                "position": "Position",
+                                "innings": "Innings",
+                                "runs": "Runs",
+                                "balls": "Balls",
+                                "strike_rate": "Strike Rate",
+                            }
+                        ),
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+            with right:
+                st.markdown("### Runs by Phase")
+                if phase_table.empty:
+                    st.info("No phase data for this scope.")
+                else:
+                    st.dataframe(
+                        phase_table.rename(
+                            columns={
+                                "phase": "Phase",
+                                "runs": "Runs",
+                                "balls": "Balls",
+                                "strike_rate": "Strike Rate",
+                            }
+                        ),
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+
+    with scope_tabs[-1]:
+        position_table, phase_table = batter_position_and_phase_summary(focus_df, NEHAL_BATTER_NAME)
+        if position_table.empty and phase_table.empty:
+            st.warning(f"No batting records found for {NEHAL_BATTER_LABEL} in 2023-2025.")
+        else:
+            left, right = st.columns(2)
+            with left:
+                st.markdown("### Runs by Batting Position")
+                if position_table.empty:
+                    st.info("No batting-position data for this scope.")
+                else:
+                    st.dataframe(
+                        position_table.rename(
+                            columns={
+                                "position": "Position",
+                                "innings": "Innings",
+                                "runs": "Runs",
+                                "balls": "Balls",
+                                "strike_rate": "Strike Rate",
+                            }
+                        ),
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+            with right:
+                st.markdown("### Runs by Phase")
+                if phase_table.empty:
+                    st.info("No phase data for this scope.")
+                else:
+                    st.dataframe(
+                        phase_table.rename(
+                            columns={
+                                "phase": "Phase",
+                                "runs": "Runs",
+                                "balls": "Balls",
+                                "strike_rate": "Strike Rate",
+                            }
+                        ),
+                        use_container_width=True,
+                        hide_index=True,
+                    )
 
 
 def render_phase_leaderboards(focus_df: pd.DataFrame, available_years: list[int]) -> None:
@@ -2553,7 +2737,7 @@ if focus_df.empty:
     st.warning("No data available in seasons 2023-2025.")
     st.stop()
 
-main_tab, phase_runs_tab, phase_wickets_tab, batter_impact_tab, bowling_impact_tab, batter_summary_tab, dot_ball_tab, boundary_impact_tab, bowling_avg_tab, batter_variance_tab, batter_30plus_tab, bowler_2w_tab, venue_summary_tab, franchise_consistency_tab, best_batters_venue_tab, home_batting_tab, home_bowling_tab, away_batting_tab, away_bowling_tab, batter_home_away_variance_tab, bowler_home_away_variance_tab = st.tabs(
+main_tab, phase_runs_tab, phase_wickets_tab, batter_impact_tab, bowling_impact_tab, batter_summary_tab, dot_ball_tab, boundary_impact_tab, bowling_avg_tab, batter_variance_tab, batter_30plus_tab, bowler_2w_tab, venue_summary_tab, franchise_consistency_tab, best_batters_venue_tab, home_batting_tab, home_bowling_tab, away_batting_tab, away_bowling_tab, batter_home_away_variance_tab, bowler_home_away_variance_tab, nehal_summary_tab = st.tabs(
     [
         "Runs & Wickets",
         "Phase-wise Runs",
@@ -2576,6 +2760,7 @@ main_tab, phase_runs_tab, phase_wickets_tab, batter_impact_tab, bowling_impact_t
         "Away Bowling Leaders",
         "Batter H-A Variance",
         "Bowler H-A Variance",
+        "Batter summary - Nehal",
     ]
 )
 
@@ -2899,3 +3084,7 @@ with bowler_home_away_variance_tab:
                 use_container_width=True,
                 hide_index=True,
             )
+
+
+with nehal_summary_tab:
+    render_nehal_batter_summary_tab(focus_df, available_years)
