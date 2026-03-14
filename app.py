@@ -67,6 +67,8 @@ PLAYER_DISPLAY_OVERRIDES = {
 }
 NEHAL_BATTER_NAME = "N Wadhera"
 NEHAL_BATTER_LABEL = "Nehal Wadhera"
+NAMAN_BATTER_NAME = "Naman Dhir"
+NAMAN_BATTER_LABEL = "Naman Dhir"
 
 
 @st.cache_data(show_spinner=False)
@@ -1995,6 +1997,102 @@ def render_nehal_batter_summary_tab(focus_df: pd.DataFrame, available_years: lis
                     )
 
 
+def render_naman_batter_summary_tab(focus_df: pd.DataFrame, available_years: list[int]) -> None:
+    st.subheader("Batter Summary - Naman Dhir")
+    st.caption(
+        "Year-wise and consolidated summary for runs and strike rate by batting position and phase "
+        "(Overs 1-6, Overs 7-14, Overs 15-20)."
+    )
+
+    scope_tabs = st.tabs([str(y) for y in available_years] + ["2023-2025 Combined"])
+
+    for idx, year in enumerate(available_years):
+        with scope_tabs[idx]:
+            scoped_df = focus_df[focus_df["season"] == year].copy()
+            position_table, phase_table = batter_position_and_phase_summary(scoped_df, NAMAN_BATTER_NAME)
+            if position_table.empty and phase_table.empty:
+                st.warning(f"No batting records found for {NAMAN_BATTER_LABEL} in {year}.")
+                continue
+            left, right = st.columns(2)
+            with left:
+                st.markdown("### Runs by Batting Position")
+                if position_table.empty:
+                    st.info("No batting-position data for this scope.")
+                else:
+                    st.dataframe(
+                        position_table.rename(
+                            columns={
+                                "position": "Position",
+                                "innings": "Innings",
+                                "runs": "Runs",
+                                "balls": "Balls",
+                                "strike_rate": "Strike Rate",
+                            }
+                        ),
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+            with right:
+                st.markdown("### Runs by Phase")
+                if phase_table.empty:
+                    st.info("No phase data for this scope.")
+                else:
+                    st.dataframe(
+                        phase_table.rename(
+                            columns={
+                                "phase": "Phase",
+                                "runs": "Runs",
+                                "balls": "Balls",
+                                "strike_rate": "Strike Rate",
+                            }
+                        ),
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+
+    with scope_tabs[-1]:
+        position_table, phase_table = batter_position_and_phase_summary(focus_df, NAMAN_BATTER_NAME)
+        if position_table.empty and phase_table.empty:
+            st.warning(f"No batting records found for {NAMAN_BATTER_LABEL} in 2023-2025.")
+        else:
+            left, right = st.columns(2)
+            with left:
+                st.markdown("### Runs by Batting Position")
+                if position_table.empty:
+                    st.info("No batting-position data for this scope.")
+                else:
+                    st.dataframe(
+                        position_table.rename(
+                            columns={
+                                "position": "Position",
+                                "innings": "Innings",
+                                "runs": "Runs",
+                                "balls": "Balls",
+                                "strike_rate": "Strike Rate",
+                            }
+                        ),
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+            with right:
+                st.markdown("### Runs by Phase")
+                if phase_table.empty:
+                    st.info("No phase data for this scope.")
+                else:
+                    st.dataframe(
+                        phase_table.rename(
+                            columns={
+                                "phase": "Phase",
+                                "runs": "Runs",
+                                "balls": "Balls",
+                                "strike_rate": "Strike Rate",
+                            }
+                        ),
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+
+
 def render_phase_leaderboards(focus_df: pd.DataFrame, available_years: list[int]) -> None:
     st.subheader("Top 20 Run Getters by Phase")
     st.caption("Phases: Overs 1-6, Overs 7-14, Overs 15-20")
@@ -2737,7 +2835,7 @@ if focus_df.empty:
     st.warning("No data available in seasons 2023-2025.")
     st.stop()
 
-main_tab, phase_runs_tab, phase_wickets_tab, batter_impact_tab, bowling_impact_tab, batter_summary_tab, dot_ball_tab, boundary_impact_tab, bowling_avg_tab, batter_variance_tab, batter_30plus_tab, bowler_2w_tab, venue_summary_tab, franchise_consistency_tab, best_batters_venue_tab, home_batting_tab, home_bowling_tab, away_batting_tab, away_bowling_tab, batter_home_away_variance_tab, bowler_home_away_variance_tab, nehal_summary_tab = st.tabs(
+main_tab, phase_runs_tab, phase_wickets_tab, batter_impact_tab, bowling_impact_tab, batter_summary_tab, dot_ball_tab, boundary_impact_tab, bowling_avg_tab, batter_variance_tab, batter_30plus_tab, bowler_2w_tab, venue_summary_tab, franchise_consistency_tab, best_batters_venue_tab, home_batting_tab, home_bowling_tab, away_batting_tab, away_bowling_tab, batter_home_away_variance_tab, bowler_home_away_variance_tab, nehal_summary_tab, naman_summary_tab = st.tabs(
     [
         "Runs & Wickets",
         "Phase-wise Runs",
@@ -2761,6 +2859,7 @@ main_tab, phase_runs_tab, phase_wickets_tab, batter_impact_tab, bowling_impact_t
         "Batter H-A Variance",
         "Bowler H-A Variance",
         "Batter summary - Nehal",
+        "Batter summary - Naman",
     ]
 )
 
@@ -3088,3 +3187,7 @@ with bowler_home_away_variance_tab:
 
 with nehal_summary_tab:
     render_nehal_batter_summary_tab(focus_df, available_years)
+
+
+with naman_summary_tab:
+    render_naman_batter_summary_tab(focus_df, available_years)
