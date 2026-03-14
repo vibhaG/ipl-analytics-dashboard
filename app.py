@@ -150,6 +150,43 @@ TODAY_BATTER_DISPLAY = {
     RINKU_BATTER_NAME: RINKU_BATTER_LABEL,
 }
 
+BOWLER_TARGET_KEYS = [
+    "Mohammed Siraj",
+    "Mohammed Shami",
+    "B Kumar",
+    "JC Archer",
+    "DL Chahar",
+    "Yash Dayal",
+    "KK Ahmed",
+    "VG Arora",
+    "PJ Cummins",
+    "JD Unadkat",
+    "Avesh Khan",
+    "MA Starc",
+    "L Ngidi",
+    "Azmatullah Omarzai",
+    "TU Deshpande",
+    "K Rabada",
+]
+BOWLER_TARGET_DISPLAY = {
+    "Mohammed Siraj": "Siraj",
+    "Mohammed Shami": "Shami",
+    "B Kumar": "Bhuvneshwar",
+    "JC Archer": "Archer",
+    "DL Chahar": "Deepak Chahar",
+    "Yash Dayal": "Yash Dayal",
+    "KK Ahmed": "Khaleel",
+    "VG Arora": "Vaibhav",
+    "PJ Cummins": "Pat Cummins",
+    "JD Unadkat": "Unadkat",
+    "Avesh Khan": "Avesh",
+    "MA Starc": "Starc",
+    "L Ngidi": "Lungi",
+    "Azmatullah Omarzai": "Omerzai",
+    "TU Deshpande": "Deshpande",
+    "K Rabada": "Rabada",
+}
+
 
 @st.cache_data(show_spinner=False)
 def load_ipl_data(data_path: str) -> pd.DataFrame:
@@ -2021,6 +2058,166 @@ def render_today_batters_phase_sr_tab(focus_df: pd.DataFrame) -> None:
             use_container_width=True,
             hide_index=True,
         )
+
+
+
+def bowler_phase_metrics_summary(df: pd.DataFrame, bowler_name: str) -> pd.DataFrame:
+    required_cols = {"bowler", "over_number", "balls_bowled", "total_runs", "wicket_kind", "match_id"}
+    if not required_cols.issubset(df.columns):
+        return pd.DataFrame(columns=["phase", "matches", "balls", "wickets", "dot_ball_pct", "balls_per_wicket", "economy_rate"])
+
+    scoped = df[(df["bowler"] == bowler_name) & (df["over_number"].between(1, 20, inclusive="both"))].copy()
+    if scoped.empty:
+        out = pd.DataFrame({"phase": PHASE_ORDER})
+        out["matches"] = 0
+        out["balls"] = 0
+        out["wickets"] = 0
+        out["dot_ball_pct"] = pd.NA
+        out["balls_per_wicket"] = pd.NA
+        out["economy_rate"] = pd.NA
+        return out
+
+    scoped["phase"] = pd.cut(
+        scoped["over_number"],
+        bins=[0, 6, 14, 20],
+        labels=PHASE_ORDER,
+        include_lowest=True,
+    )
+    scoped["is_bowler_wicket"] = scoped["wicket_kind"].isin(BOWLER_WICKET_KINDS).astype(int)
+    scoped["dot_ball"] = ((scoped["balls_bowled"] == 1) & (scoped["total_runs"] == 0)).astype(int)
+
+    grouped = (
+        scoped.dropna(subset=["phase"])
+        .groupby("phase", as_index=False, observed=True)
+        .agg(
+            matches=("match_id", "nunique"),
+            balls=("balls_bowled", "sum"),
+            wickets=("is_bowler_wicket", "sum"),
+            dot_balls=("dot_ball", "sum"),
+            runs_conceded=("total_runs", "sum"),
+        )
+    )
+
+    grouped["phase"] = pd.Categorical(grouped["phase"], PHASE_ORDER, ordered=True)
+    grouped = grouped.set_index("phase").reindex(PHASE_ORDER).reset_index()
+    for col in ["matches", "balls", "wickets", "dot_balls", "runs_conceded"]:
+        grouped[col] = grouped[col].fillna(0)
+
+    balls_num = pd.to_numeric(grouped["balls"], errors="coerce")
+    wickets_num = pd.to_numeric(grouped["wickets"], errors="coerce")
+    dot_num = pd.to_numeric(grouped["dot_balls"], errors="coerce")
+    runs_num = pd.to_numeric(grouped["runs_conceded"], errors="coerce")
+    grouped["dot_ball_pct"] = ((dot_num / balls_num.where(balls_num != 0)) * 100).round(2)
+    grouped["balls_per_wicket"] = (balls_num / wickets_num.where(wickets_num != 0)).round(2)
+    grouped["economy_rate"] = ((runs_num * 6) / balls_num.where(balls_num != 0)).round(2)
+
+    return grouped[["phase", "matches", "balls", "wickets", "dot_ball_pct", "balls_per_wicket", "economy_rate"]]
+
+
+def render_bowler_phase_profile_tab(
+    focus_df: pd.DataFrame,
+    available_years: list[int],
+    bowler_key: str,
+    bowler_label: str,
+) -> None:
+    st.subheader(f"Bowler Summary - {bowler_label}")
+    st.caption(
+        "Phase-wise metrics: matches, balls, wickets, dot ball %, balls per wicket, economy rate "
+        "for Overs 1-6, Overs 7-14, Overs 15-20."
+    )
+
+    scope_tabs = st.tabs([str(y) for y in available_years] + ["2023-2025 Combined"])
+    for idx, year in enumerate(available_years):
+        with scope_tabs[idx]:
+            scoped_df = focus_df[focus_df["season"] == year].copy()
+            summary = bowler_phase_metrics_summary(scoped_df, bowler_key)
+            st.dataframe(
+                summary.rename(
+                    columns={
+                        "phase": "Phase",
+                        "matches": "Matches",
+                        "balls": "Balls",
+                        "wickets": "Wickets",
+                        "dot_ball_pct": "Dot Ball %",
+                        "balls_per_wicket": "Balls/Wicket",
+                        "economy_rate": "Economy",
+                    }
+                ),
+                use_container_width=True,
+                hide_index=True,
+            )
+
+    with scope_tabs[-1]:
+        summary = bowler_phase_metrics_summary(focus_df, bowler_key)
+        st.dataframe(
+            summary.rename(
+                columns={
+                    "phase": "Phase",
+                    "matches": "Matches",
+                    "balls": "Balls",
+                    "wickets": "Wickets",
+                    "dot_ball_pct": "Dot Ball %",
+                    "balls_per_wicket": "Balls/Wicket",
+                    "economy_rate": "Economy",
+                }
+            ),
+            use_container_width=True,
+            hide_index=True,
+        )
+
+
+def targeted_bowler_consolidated_ranking(df: pd.DataFrame) -> pd.DataFrame:
+    required_cols = {"bowler", "over_number", "balls_bowled", "total_runs", "wicket_kind", "match_id"}
+    if not required_cols.issubset(df.columns):
+        return pd.DataFrame(columns=["name", "matches", "balls_total", "wickets_total", "balls_per_wicket", "economy_rate"])
+
+    scoped = df[(df["bowler"].isin(BOWLER_TARGET_KEYS)) & (df["over_number"].between(1, 20, inclusive="both"))].copy()
+    if scoped.empty:
+        return pd.DataFrame(columns=["name", "matches", "balls_total", "wickets_total", "balls_per_wicket", "economy_rate"])
+
+    scoped["is_bowler_wicket"] = scoped["wicket_kind"].isin(BOWLER_WICKET_KINDS).astype(int)
+    summary = (
+        scoped.groupby("bowler", as_index=False)
+        .agg(
+            matches=("match_id", "nunique"),
+            balls_total=("balls_bowled", "sum"),
+            wickets_total=("is_bowler_wicket", "sum"),
+            runs_conceded=("total_runs", "sum"),
+        )
+    )
+
+    summary = summary.set_index("bowler").reindex(BOWLER_TARGET_KEYS).reset_index()
+    for col in ["matches", "balls_total", "wickets_total", "runs_conceded"]:
+        summary[col] = summary[col].fillna(0)
+    balls_num = pd.to_numeric(summary["balls_total"], errors="coerce")
+    wickets_num = pd.to_numeric(summary["wickets_total"], errors="coerce")
+    runs_num = pd.to_numeric(summary["runs_conceded"], errors="coerce")
+    summary["balls_per_wicket"] = (balls_num / wickets_num.where(wickets_num != 0)).round(2)
+    summary["economy_rate"] = ((runs_num * 6) / balls_num.where(balls_num != 0)).round(2)
+    summary["name"] = summary["bowler"].map(BOWLER_TARGET_DISPLAY).fillna(summary["bowler"])
+
+    summary = summary.sort_values(["balls_per_wicket", "balls_total", "name"], ascending=[False, False, True], na_position="last")
+    return summary[["name", "matches", "balls_total", "wickets_total", "balls_per_wicket", "economy_rate"]].reset_index(drop=True)
+
+
+def render_target_bowler_consolidated_tab(focus_df: pd.DataFrame) -> None:
+    st.subheader("Target Bowlers - Consolidated Ranking (2023-2025)")
+    st.caption("Ranked by Balls/Wicket descending. Scope: consolidated across 2023-2025.")
+    table = targeted_bowler_consolidated_ranking(focus_df)
+    st.dataframe(
+        table.rename(
+            columns={
+                "name": "Name",
+                "matches": "Matches",
+                "balls_total": "Balls Total",
+                "wickets_total": "Wickets Total",
+                "balls_per_wicket": "Balls/Wicket",
+                "economy_rate": "Economy",
+            }
+        ),
+        use_container_width=True,
+        hide_index=True,
+    )
 
 
 def render_main_leaderboards(focus_df: pd.DataFrame, available_years: list[int]) -> None:
@@ -4725,7 +4922,7 @@ if focus_df.empty:
     st.warning("No data available in seasons 2023-2025.")
     st.stop()
 
-main_tab, phase_runs_tab, phase_wickets_tab, batter_impact_tab, bowling_impact_tab, batter_summary_tab, dot_ball_tab, boundary_impact_tab, bowling_avg_tab, batter_variance_tab, batter_30plus_tab, bowler_2w_tab, venue_summary_tab, franchise_consistency_tab, best_batters_venue_tab, home_batting_tab, home_bowling_tab, away_batting_tab, away_bowling_tab, batter_home_away_variance_tab, bowler_home_away_variance_tab, nehal_summary_tab, naman_summary_tab, angkrish_summary_tab, ayush_summary_tab, dewald_summary_tab, rajat_summary_tab, dhruv_summary_tab, rutherford_summary_tab, shivam_summary_tab, jitesh_summary_tab, shashank_summary_tab, ashutosh_summary_tab, ramandeep_summary_tab, aniket_summary_tab, riyan_summary_tab, shreyas_summary_tab, tilak_summary_tab, axar_summary_tab, hardik_summary_tab, rinku_summary_tab, today_batters_sr_tab = st.tabs(
+main_tab, phase_runs_tab, phase_wickets_tab, batter_impact_tab, bowling_impact_tab, batter_summary_tab, dot_ball_tab, boundary_impact_tab, bowling_avg_tab, batter_variance_tab, batter_30plus_tab, bowler_2w_tab, venue_summary_tab, franchise_consistency_tab, best_batters_venue_tab, home_batting_tab, home_bowling_tab, away_batting_tab, away_bowling_tab, batter_home_away_variance_tab, bowler_home_away_variance_tab, nehal_summary_tab, naman_summary_tab, angkrish_summary_tab, ayush_summary_tab, dewald_summary_tab, rajat_summary_tab, dhruv_summary_tab, rutherford_summary_tab, shivam_summary_tab, jitesh_summary_tab, shashank_summary_tab, ashutosh_summary_tab, ramandeep_summary_tab, aniket_summary_tab, riyan_summary_tab, shreyas_summary_tab, tilak_summary_tab, axar_summary_tab, hardik_summary_tab, rinku_summary_tab, today_batters_sr_tab, siraj_bowler_tab, shami_bowler_tab, bhuvi_bowler_tab, archer_bowler_tab, deepak_bowler_tab, yash_bowler_tab, khaleel_bowler_tab, vaibhav_bowler_tab, cummins_bowler_tab, unadkat_bowler_tab, avesh_bowler_tab, starc_bowler_tab, lungi_bowler_tab, omerzai_bowler_tab, deshpande_bowler_tab, rabada_bowler_tab, target_bowler_rank_tab = st.tabs(
     [
         "Runs & Wickets",
         "Phase-wise Runs",
@@ -4769,6 +4966,23 @@ main_tab, phase_runs_tab, phase_wickets_tab, batter_impact_tab, bowling_impact_t
         "Batter summary - Hardik",
         "Batter summary - Rinku",
         "Today Batters 7-14/15-20 SR",
+        "Bowler summary - Siraj",
+        "Bowler summary - Shami",
+        "Bowler summary - Bhuvneshwar",
+        "Bowler summary - Archer",
+        "Bowler summary - Deepak Chahar",
+        "Bowler summary - Yash Dayal",
+        "Bowler summary - Khaleel",
+        "Bowler summary - Vaibhav",
+        "Bowler summary - Pat Cummins",
+        "Bowler summary - Unadkat",
+        "Bowler summary - Avesh",
+        "Bowler summary - Starc",
+        "Bowler summary - Lungi",
+        "Bowler summary - Omerzai",
+        "Bowler summary - Deshpande",
+        "Bowler summary - Rabada",
+        "Target Bowlers - Consolidated",
     ]
 )
 
@@ -5176,3 +5390,55 @@ with hardik_summary_tab:
 
 with rinku_summary_tab:
     render_rinku_batter_summary_tab(focus_df, available_years)
+
+
+with siraj_bowler_tab:
+    render_bowler_phase_profile_tab(focus_df, available_years, "Mohammed Siraj", "Siraj")
+
+with shami_bowler_tab:
+    render_bowler_phase_profile_tab(focus_df, available_years, "Mohammed Shami", "Shami")
+
+with bhuvi_bowler_tab:
+    render_bowler_phase_profile_tab(focus_df, available_years, "B Kumar", "Bhuvneshwar")
+
+with archer_bowler_tab:
+    render_bowler_phase_profile_tab(focus_df, available_years, "JC Archer", "Archer")
+
+with deepak_bowler_tab:
+    render_bowler_phase_profile_tab(focus_df, available_years, "DL Chahar", "Deepak Chahar")
+
+with yash_bowler_tab:
+    render_bowler_phase_profile_tab(focus_df, available_years, "Yash Dayal", "Yash Dayal")
+
+with khaleel_bowler_tab:
+    render_bowler_phase_profile_tab(focus_df, available_years, "KK Ahmed", "Khaleel")
+
+with vaibhav_bowler_tab:
+    render_bowler_phase_profile_tab(focus_df, available_years, "VG Arora", "Vaibhav")
+
+with cummins_bowler_tab:
+    render_bowler_phase_profile_tab(focus_df, available_years, "PJ Cummins", "Pat Cummins")
+
+with unadkat_bowler_tab:
+    render_bowler_phase_profile_tab(focus_df, available_years, "JD Unadkat", "Unadkat")
+
+with avesh_bowler_tab:
+    render_bowler_phase_profile_tab(focus_df, available_years, "Avesh Khan", "Avesh")
+
+with starc_bowler_tab:
+    render_bowler_phase_profile_tab(focus_df, available_years, "MA Starc", "Starc")
+
+with lungi_bowler_tab:
+    render_bowler_phase_profile_tab(focus_df, available_years, "L Ngidi", "Lungi")
+
+with omerzai_bowler_tab:
+    render_bowler_phase_profile_tab(focus_df, available_years, "Azmatullah Omarzai", "Omerzai")
+
+with deshpande_bowler_tab:
+    render_bowler_phase_profile_tab(focus_df, available_years, "TU Deshpande", "Deshpande")
+
+with rabada_bowler_tab:
+    render_bowler_phase_profile_tab(focus_df, available_years, "K Rabada", "Rabada")
+
+with target_bowler_rank_tab:
+    render_target_bowler_consolidated_tab(focus_df)
