@@ -1937,7 +1937,6 @@ def batter_position_and_phase_summary(df: pd.DataFrame, batter_name: str) -> tup
     return position_table, phase_table
 
 
-@st.cache_data(show_spinner=False)
 def today_batters_phase_sr_summary(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     required_cols = {"batter", "runs", "balls_faced", "over_number"}
     if not required_cols.issubset(df.columns):
