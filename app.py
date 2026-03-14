@@ -1948,6 +1948,7 @@ def today_batters_phase_sr_summary(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.D
         phase_df["runs"] = phase_df["runs"].fillna(0)
         phase_df["balls"] = phase_df["balls"].fillna(0)
         phase_df["strike_rate"] = ((phase_df["runs"] / phase_df["balls"].replace(0, pd.NA)) * 100).round(2)
+        phase_df = phase_df[phase_df["balls"] >= 50].copy()
         phase_df["batter"] = phase_df["batter"].map(TODAY_BATTER_DISPLAY).fillna(phase_df["batter"])
         phase_df = phase_df.sort_values(["strike_rate", "runs", "balls", "batter"], ascending=[False, False, False, True], na_position="last").reset_index(drop=True)
         phase_df["rank"] = phase_df.index + 1
@@ -1959,7 +1960,8 @@ def today_batters_phase_sr_summary(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.D
 def render_today_batters_phase_sr_tab(focus_df: pd.DataFrame) -> None:
     st.subheader("Today Batters - Phase SR (2023-2025 Combined)")
     st.caption(
-        "All processed batters retained. Rankings are by strike rate descending for Overs 7-14 and Overs 15-20, consolidated across 2023-2025."
+        "Rankings are by strike rate descending for Overs 7-14 and Overs 15-20, consolidated across 2023-2025. "
+        "Eligibility: minimum 50 balls faced in the respective phase."
     )
 
     phase_7_14, phase_15_20 = today_batters_phase_sr_summary(focus_df)
