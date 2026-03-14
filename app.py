@@ -77,6 +77,14 @@ DEWALD_BATTER_NAME = "D Brevis"
 DEWALD_BATTER_LABEL = "Dewald Brevis"
 RAJAT_BATTER_NAME = "RM Patidar"
 RAJAT_BATTER_LABEL = "Rajat Patidar"
+DHRUV_BATTER_NAME = "Dhruv Jurel"
+DHRUV_BATTER_LABEL = "Dhruv Jurel"
+RUTHERFORD_BATTER_NAME = "SE Rutherford"
+RUTHERFORD_BATTER_LABEL = "Sherfane Rutherford"
+SHIVAM_BATTER_NAME = "S Dube"
+SHIVAM_BATTER_LABEL = "Shivam Dube"
+JITESH_BATTER_NAME = "JM Sharma"
+JITESH_BATTER_LABEL = "Jitesh Sharma"
 
 
 @st.cache_data(show_spinner=False)
@@ -2485,6 +2493,390 @@ def render_rajat_batter_summary_tab(focus_df: pd.DataFrame, available_years: lis
                     )
 
 
+def render_dhruv_batter_summary_tab(focus_df: pd.DataFrame, available_years: list[int]) -> None:
+    st.subheader("Batter Summary - Dhruv Jurel")
+    st.caption(
+        "Year-wise and consolidated summary for runs and strike rate by batting position and phase "
+        "(Overs 1-6, Overs 7-14, Overs 15-20)."
+    )
+
+    scope_tabs = st.tabs([str(y) for y in available_years] + ["2023-2025 Combined"])
+
+    for idx, year in enumerate(available_years):
+        with scope_tabs[idx]:
+            scoped_df = focus_df[focus_df["season"] == year].copy()
+            position_table, phase_table = batter_position_and_phase_summary(scoped_df, DHRUV_BATTER_NAME)
+            if position_table.empty and phase_table.empty:
+                st.warning(f"No batting records found for {DHRUV_BATTER_LABEL} in {year}.")
+                continue
+            left, right = st.columns(2)
+            with left:
+                st.markdown("### Runs by Batting Position")
+                if position_table.empty:
+                    st.info("No batting-position data for this scope.")
+                else:
+                    st.dataframe(
+                        position_table.rename(
+                            columns={
+                                "position": "Position",
+                                "innings": "Innings",
+                                "runs": "Runs",
+                                "balls": "Balls",
+                                "strike_rate": "Strike Rate",
+                            }
+                        ),
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+            with right:
+                st.markdown("### Runs by Phase")
+                if phase_table.empty:
+                    st.info("No phase data for this scope.")
+                else:
+                    st.dataframe(
+                        phase_table.rename(
+                            columns={
+                                "phase": "Phase",
+                                "runs": "Runs",
+                                "balls": "Balls",
+                                "strike_rate": "Strike Rate",
+                            }
+                        ),
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+
+    with scope_tabs[-1]:
+        position_table, phase_table = batter_position_and_phase_summary(focus_df, DHRUV_BATTER_NAME)
+        if position_table.empty and phase_table.empty:
+            st.warning(f"No batting records found for {DHRUV_BATTER_LABEL} in 2023-2025.")
+        else:
+            left, right = st.columns(2)
+            with left:
+                st.markdown("### Runs by Batting Position")
+                if position_table.empty:
+                    st.info("No batting-position data for this scope.")
+                else:
+                    st.dataframe(
+                        position_table.rename(
+                            columns={
+                                "position": "Position",
+                                "innings": "Innings",
+                                "runs": "Runs",
+                                "balls": "Balls",
+                                "strike_rate": "Strike Rate",
+                            }
+                        ),
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+            with right:
+                st.markdown("### Runs by Phase")
+                if phase_table.empty:
+                    st.info("No phase data for this scope.")
+                else:
+                    st.dataframe(
+                        phase_table.rename(
+                            columns={
+                                "phase": "Phase",
+                                "runs": "Runs",
+                                "balls": "Balls",
+                                "strike_rate": "Strike Rate",
+                            }
+                        ),
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+
+
+def render_rutherford_batter_summary_tab(focus_df: pd.DataFrame, available_years: list[int]) -> None:
+    st.subheader("Batter Summary - Sherfane Rutherford")
+    st.caption(
+        "Year-wise and consolidated summary for runs and strike rate by batting position and phase "
+        "(Overs 1-6, Overs 7-14, Overs 15-20)."
+    )
+
+    scope_tabs = st.tabs([str(y) for y in available_years] + ["2023-2025 Combined"])
+
+    for idx, year in enumerate(available_years):
+        with scope_tabs[idx]:
+            scoped_df = focus_df[focus_df["season"] == year].copy()
+            position_table, phase_table = batter_position_and_phase_summary(scoped_df, RUTHERFORD_BATTER_NAME)
+            if position_table.empty and phase_table.empty:
+                st.warning(f"No batting records found for {RUTHERFORD_BATTER_LABEL} in {year}.")
+                continue
+            left, right = st.columns(2)
+            with left:
+                st.markdown("### Runs by Batting Position")
+                if position_table.empty:
+                    st.info("No batting-position data for this scope.")
+                else:
+                    st.dataframe(
+                        position_table.rename(
+                            columns={
+                                "position": "Position",
+                                "innings": "Innings",
+                                "runs": "Runs",
+                                "balls": "Balls",
+                                "strike_rate": "Strike Rate",
+                            }
+                        ),
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+            with right:
+                st.markdown("### Runs by Phase")
+                if phase_table.empty:
+                    st.info("No phase data for this scope.")
+                else:
+                    st.dataframe(
+                        phase_table.rename(
+                            columns={
+                                "phase": "Phase",
+                                "runs": "Runs",
+                                "balls": "Balls",
+                                "strike_rate": "Strike Rate",
+                            }
+                        ),
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+
+    with scope_tabs[-1]:
+        position_table, phase_table = batter_position_and_phase_summary(focus_df, RUTHERFORD_BATTER_NAME)
+        if position_table.empty and phase_table.empty:
+            st.warning(f"No batting records found for {RUTHERFORD_BATTER_LABEL} in 2023-2025.")
+        else:
+            left, right = st.columns(2)
+            with left:
+                st.markdown("### Runs by Batting Position")
+                if position_table.empty:
+                    st.info("No batting-position data for this scope.")
+                else:
+                    st.dataframe(
+                        position_table.rename(
+                            columns={
+                                "position": "Position",
+                                "innings": "Innings",
+                                "runs": "Runs",
+                                "balls": "Balls",
+                                "strike_rate": "Strike Rate",
+                            }
+                        ),
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+            with right:
+                st.markdown("### Runs by Phase")
+                if phase_table.empty:
+                    st.info("No phase data for this scope.")
+                else:
+                    st.dataframe(
+                        phase_table.rename(
+                            columns={
+                                "phase": "Phase",
+                                "runs": "Runs",
+                                "balls": "Balls",
+                                "strike_rate": "Strike Rate",
+                            }
+                        ),
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+
+
+def render_shivam_batter_summary_tab(focus_df: pd.DataFrame, available_years: list[int]) -> None:
+    st.subheader("Batter Summary - Shivam Dube")
+    st.caption(
+        "Year-wise and consolidated summary for runs and strike rate by batting position and phase "
+        "(Overs 1-6, Overs 7-14, Overs 15-20)."
+    )
+
+    scope_tabs = st.tabs([str(y) for y in available_years] + ["2023-2025 Combined"])
+
+    for idx, year in enumerate(available_years):
+        with scope_tabs[idx]:
+            scoped_df = focus_df[focus_df["season"] == year].copy()
+            position_table, phase_table = batter_position_and_phase_summary(scoped_df, SHIVAM_BATTER_NAME)
+            if position_table.empty and phase_table.empty:
+                st.warning(f"No batting records found for {SHIVAM_BATTER_LABEL} in {year}.")
+                continue
+            left, right = st.columns(2)
+            with left:
+                st.markdown("### Runs by Batting Position")
+                if position_table.empty:
+                    st.info("No batting-position data for this scope.")
+                else:
+                    st.dataframe(
+                        position_table.rename(
+                            columns={
+                                "position": "Position",
+                                "innings": "Innings",
+                                "runs": "Runs",
+                                "balls": "Balls",
+                                "strike_rate": "Strike Rate",
+                            }
+                        ),
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+            with right:
+                st.markdown("### Runs by Phase")
+                if phase_table.empty:
+                    st.info("No phase data for this scope.")
+                else:
+                    st.dataframe(
+                        phase_table.rename(
+                            columns={
+                                "phase": "Phase",
+                                "runs": "Runs",
+                                "balls": "Balls",
+                                "strike_rate": "Strike Rate",
+                            }
+                        ),
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+
+    with scope_tabs[-1]:
+        position_table, phase_table = batter_position_and_phase_summary(focus_df, SHIVAM_BATTER_NAME)
+        if position_table.empty and phase_table.empty:
+            st.warning(f"No batting records found for {SHIVAM_BATTER_LABEL} in 2023-2025.")
+        else:
+            left, right = st.columns(2)
+            with left:
+                st.markdown("### Runs by Batting Position")
+                if position_table.empty:
+                    st.info("No batting-position data for this scope.")
+                else:
+                    st.dataframe(
+                        position_table.rename(
+                            columns={
+                                "position": "Position",
+                                "innings": "Innings",
+                                "runs": "Runs",
+                                "balls": "Balls",
+                                "strike_rate": "Strike Rate",
+                            }
+                        ),
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+            with right:
+                st.markdown("### Runs by Phase")
+                if phase_table.empty:
+                    st.info("No phase data for this scope.")
+                else:
+                    st.dataframe(
+                        phase_table.rename(
+                            columns={
+                                "phase": "Phase",
+                                "runs": "Runs",
+                                "balls": "Balls",
+                                "strike_rate": "Strike Rate",
+                            }
+                        ),
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+
+
+def render_jitesh_batter_summary_tab(focus_df: pd.DataFrame, available_years: list[int]) -> None:
+    st.subheader("Batter Summary - Jitesh Sharma")
+    st.caption(
+        "Year-wise and consolidated summary for runs and strike rate by batting position and phase "
+        "(Overs 1-6, Overs 7-14, Overs 15-20)."
+    )
+
+    scope_tabs = st.tabs([str(y) for y in available_years] + ["2023-2025 Combined"])
+
+    for idx, year in enumerate(available_years):
+        with scope_tabs[idx]:
+            scoped_df = focus_df[focus_df["season"] == year].copy()
+            position_table, phase_table = batter_position_and_phase_summary(scoped_df, JITESH_BATTER_NAME)
+            if position_table.empty and phase_table.empty:
+                st.warning(f"No batting records found for {JITESH_BATTER_LABEL} in {year}.")
+                continue
+            left, right = st.columns(2)
+            with left:
+                st.markdown("### Runs by Batting Position")
+                if position_table.empty:
+                    st.info("No batting-position data for this scope.")
+                else:
+                    st.dataframe(
+                        position_table.rename(
+                            columns={
+                                "position": "Position",
+                                "innings": "Innings",
+                                "runs": "Runs",
+                                "balls": "Balls",
+                                "strike_rate": "Strike Rate",
+                            }
+                        ),
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+            with right:
+                st.markdown("### Runs by Phase")
+                if phase_table.empty:
+                    st.info("No phase data for this scope.")
+                else:
+                    st.dataframe(
+                        phase_table.rename(
+                            columns={
+                                "phase": "Phase",
+                                "runs": "Runs",
+                                "balls": "Balls",
+                                "strike_rate": "Strike Rate",
+                            }
+                        ),
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+
+    with scope_tabs[-1]:
+        position_table, phase_table = batter_position_and_phase_summary(focus_df, JITESH_BATTER_NAME)
+        if position_table.empty and phase_table.empty:
+            st.warning(f"No batting records found for {JITESH_BATTER_LABEL} in 2023-2025.")
+        else:
+            left, right = st.columns(2)
+            with left:
+                st.markdown("### Runs by Batting Position")
+                if position_table.empty:
+                    st.info("No batting-position data for this scope.")
+                else:
+                    st.dataframe(
+                        position_table.rename(
+                            columns={
+                                "position": "Position",
+                                "innings": "Innings",
+                                "runs": "Runs",
+                                "balls": "Balls",
+                                "strike_rate": "Strike Rate",
+                            }
+                        ),
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+            with right:
+                st.markdown("### Runs by Phase")
+                if phase_table.empty:
+                    st.info("No phase data for this scope.")
+                else:
+                    st.dataframe(
+                        phase_table.rename(
+                            columns={
+                                "phase": "Phase",
+                                "runs": "Runs",
+                                "balls": "Balls",
+                                "strike_rate": "Strike Rate",
+                            }
+                        ),
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+
+
 def render_phase_leaderboards(focus_df: pd.DataFrame, available_years: list[int]) -> None:
     st.subheader("Top 20 Run Getters by Phase")
     st.caption("Phases: Overs 1-6, Overs 7-14, Overs 15-20")
@@ -3227,7 +3619,7 @@ if focus_df.empty:
     st.warning("No data available in seasons 2023-2025.")
     st.stop()
 
-main_tab, phase_runs_tab, phase_wickets_tab, batter_impact_tab, bowling_impact_tab, batter_summary_tab, dot_ball_tab, boundary_impact_tab, bowling_avg_tab, batter_variance_tab, batter_30plus_tab, bowler_2w_tab, venue_summary_tab, franchise_consistency_tab, best_batters_venue_tab, home_batting_tab, home_bowling_tab, away_batting_tab, away_bowling_tab, batter_home_away_variance_tab, bowler_home_away_variance_tab, nehal_summary_tab, naman_summary_tab, angkrish_summary_tab, ayush_summary_tab, dewald_summary_tab, rajat_summary_tab = st.tabs(
+main_tab, phase_runs_tab, phase_wickets_tab, batter_impact_tab, bowling_impact_tab, batter_summary_tab, dot_ball_tab, boundary_impact_tab, bowling_avg_tab, batter_variance_tab, batter_30plus_tab, bowler_2w_tab, venue_summary_tab, franchise_consistency_tab, best_batters_venue_tab, home_batting_tab, home_bowling_tab, away_batting_tab, away_bowling_tab, batter_home_away_variance_tab, bowler_home_away_variance_tab, nehal_summary_tab, naman_summary_tab, angkrish_summary_tab, ayush_summary_tab, dewald_summary_tab, rajat_summary_tab, dhruv_summary_tab, rutherford_summary_tab, shivam_summary_tab, jitesh_summary_tab = st.tabs(
     [
         "Runs & Wickets",
         "Phase-wise Runs",
@@ -3256,6 +3648,10 @@ main_tab, phase_runs_tab, phase_wickets_tab, batter_impact_tab, bowling_impact_t
         "Batter summary - Ayush",
         "Batter summary - Dewald",
         "Batter summary - Rajat",
+        "Batter summary - Dhruv",
+        "Batter summary - Rutherford",
+        "Batter summary - Shivam",
+        "Batter summary - Jitesh",
     ]
 )
 
@@ -3603,3 +3999,19 @@ with dewald_summary_tab:
 
 with rajat_summary_tab:
     render_rajat_batter_summary_tab(focus_df, available_years)
+
+
+with dhruv_summary_tab:
+    render_dhruv_batter_summary_tab(focus_df, available_years)
+
+
+with rutherford_summary_tab:
+    render_rutherford_batter_summary_tab(focus_df, available_years)
+
+
+with shivam_summary_tab:
+    render_shivam_batter_summary_tab(focus_df, available_years)
+
+
+with jitesh_summary_tab:
+    render_jitesh_batter_summary_tab(focus_df, available_years)
