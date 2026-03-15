@@ -23,6 +23,7 @@ BOWLER_WICKET_KINDS = {
     "stumped",
     "hit wicket",
 }
+FIELDING_POINTS_KINDS = {"caught", "stumped", "run out"}
 
 HOME_VENUES_BY_FRANCHISE = {
     "Chennai Super Kings": {
@@ -204,6 +205,7 @@ def load_ipl_data(data_path: str) -> pd.DataFrame:
     replacement_in_candidates = ["replacement_in"]
     replacements_out_candidates = ["replacements_out", "replacement_out"]
     wicket_kind_candidates = ["wicket_kind", "wicket_type"]
+    wicket_player_out_candidates = ["wicket_player_out", "player_dismissed"]
     over_index_candidates = ["ball_over", "over"]
     wides_candidates = ["extra_wides", "wides"]
     noballs_candidates = ["extra_noballs", "noballs"]
@@ -214,6 +216,11 @@ def load_ipl_data(data_path: str) -> pd.DataFrame:
     venue_candidates = ["venue"]
     city_candidates = ["city"]
     date_candidates = ["dates", "start_date", "date"]
+    match_number_candidates = ["match_number"]
+    outcome_winner_candidates = ["outcome_winner", "winner"]
+    player_of_match_candidates = ["player_of_match"]
+    legbyes_candidates = ["extra_legbyes", "legbyes"]
+    byes_candidates = ["extra_byes", "byes"]
 
     batter_col = next((col for col in batter_candidates if col in df.columns), None)
     non_striker_col = next((col for col in non_striker_candidates if col in df.columns), None)
@@ -227,6 +234,7 @@ def load_ipl_data(data_path: str) -> pd.DataFrame:
     replacement_in_col = next((col for col in replacement_in_candidates if col in df.columns), None)
     replacements_out_col = next((col for col in replacements_out_candidates if col in df.columns), None)
     wicket_kind_col = next((col for col in wicket_kind_candidates if col in df.columns), None)
+    wicket_player_out_col = next((col for col in wicket_player_out_candidates if col in df.columns), None)
     over_index_col = next((col for col in over_index_candidates if col in df.columns), None)
     wides_col = next((col for col in wides_candidates if col in df.columns), None)
     noballs_col = next((col for col in noballs_candidates if col in df.columns), None)
@@ -237,6 +245,11 @@ def load_ipl_data(data_path: str) -> pd.DataFrame:
     venue_col = next((col for col in venue_candidates if col in df.columns), None)
     city_col = next((col for col in city_candidates if col in df.columns), None)
     date_col = next((col for col in date_candidates if col in df.columns), None)
+    match_number_col = next((col for col in match_number_candidates if col in df.columns), None)
+    outcome_winner_col = next((col for col in outcome_winner_candidates if col in df.columns), None)
+    player_of_match_col = next((col for col in player_of_match_candidates if col in df.columns), None)
+    legbyes_col = next((col for col in legbyes_candidates if col in df.columns), None)
+    byes_col = next((col for col in byes_candidates if col in df.columns), None)
     ball_col = "ball" if "ball" in df.columns else None
 
     if "season" not in df.columns or not batter_col or not runs_col or not bowler_col:
@@ -263,6 +276,8 @@ def load_ipl_data(data_path: str) -> pd.DataFrame:
         keep_cols.append(replacements_out_col)
     if wicket_kind_col:
         keep_cols.append(wicket_kind_col)
+    if wicket_player_out_col:
+        keep_cols.append(wicket_player_out_col)
     if over_index_col:
         keep_cols.append(over_index_col)
     if wides_col:
@@ -283,6 +298,16 @@ def load_ipl_data(data_path: str) -> pd.DataFrame:
         keep_cols.append(city_col)
     if date_col:
         keep_cols.append(date_col)
+    if match_number_col:
+        keep_cols.append(match_number_col)
+    if outcome_winner_col:
+        keep_cols.append(outcome_winner_col)
+    if player_of_match_col:
+        keep_cols.append(player_of_match_col)
+    if legbyes_col:
+        keep_cols.append(legbyes_col)
+    if byes_col:
+        keep_cols.append(byes_col)
     if ball_col:
         keep_cols.append(ball_col)
 
@@ -311,6 +336,8 @@ def load_ipl_data(data_path: str) -> pd.DataFrame:
         rename_map[replacements_out_col] = "replacements_out"
     if wicket_kind_col:
         rename_map[wicket_kind_col] = "wicket_kind"
+    if wicket_player_out_col:
+        rename_map[wicket_player_out_col] = "wicket_player_out"
     if over_index_col:
         rename_map[over_index_col] = "over_index"
     if wides_col:
@@ -331,12 +358,24 @@ def load_ipl_data(data_path: str) -> pd.DataFrame:
         rename_map[city_col] = "city"
     if date_col:
         rename_map[date_col] = "match_date_raw"
+    if match_number_col:
+        rename_map[match_number_col] = "match_number"
+    if outcome_winner_col:
+        rename_map[outcome_winner_col] = "outcome_winner"
+    if player_of_match_col:
+        rename_map[player_of_match_col] = "player_of_match"
+    if legbyes_col:
+        rename_map[legbyes_col] = "legbyes"
+    if byes_col:
+        rename_map[byes_col] = "byes"
     if ball_col:
         rename_map[ball_col] = "ball"
     df = df.rename(columns=rename_map)
 
     if "wicket_kind" not in df.columns:
         df["wicket_kind"] = ""
+    if "wicket_player_out" not in df.columns:
+        df["wicket_player_out"] = pd.NA
 
     # Some files encode season as strings like "{2018}".
     df["season"] = df["season"].astype(str).str.extract(r"(\d{4})", expand=False)
@@ -386,6 +425,16 @@ def load_ipl_data(data_path: str) -> pd.DataFrame:
         df["replacements_out"] = pd.NA
     if "match_date_raw" not in df.columns:
         df["match_date_raw"] = pd.NA
+    if "match_number" not in df.columns:
+        df["match_number"] = pd.NA
+    if "outcome_winner" not in df.columns:
+        df["outcome_winner"] = pd.NA
+    if "player_of_match" not in df.columns:
+        df["player_of_match"] = pd.NA
+    if "legbyes" not in df.columns:
+        df["legbyes"] = 0
+    if "byes" not in df.columns:
+        df["byes"] = 0
 
     if "over_index" in df.columns:
         df["over_number"] = pd.to_numeric(df["over_index"], errors="coerce")
@@ -414,8 +463,14 @@ def load_ipl_data(data_path: str) -> pd.DataFrame:
     df["team_a"] = df["team_a"].astype(str).str.strip()
     df["team_b"] = df["team_b"].astype(str).str.strip()
     df["wicket_fielders"] = df["wicket_fielders"].astype(str).str.strip()
+    df["wicket_player_out"] = df["wicket_player_out"].astype(str).str.strip()
     df["replacement_in"] = df["replacement_in"].astype(str).str.strip()
     df["replacements_out"] = df["replacements_out"].astype(str).str.strip()
+    df["match_number"] = df["match_number"].astype(str).str.strip()
+    df["outcome_winner"] = df["outcome_winner"].astype(str).str.strip()
+    df["player_of_match"] = df["player_of_match"].astype(str).str.strip()
+    df["legbyes"] = pd.to_numeric(df["legbyes"], errors="coerce").fillna(0)
+    df["byes"] = pd.to_numeric(df["byes"], errors="coerce").fillna(0)
     # Derive bowling team when dataset omits it (common in some schemas with team_a/team_b + batting_team).
     missing_bowling = df["bowling_team"].str.lower().isin({"", "nan", "none", "<na>"})
     team_a_valid = ~df["team_a"].str.lower().isin({"", "nan", "none", "<na>"})
@@ -4892,6 +4947,788 @@ def render_venue_and_milestones(
     st.dataframe(display_df, use_container_width=True, hide_index=True)
 
 
+AUCTION_2025_TEST_PLAYERS = [
+    "Nathan Ellis",
+    "Manimaran Siddharth",
+    "Shubham Dubey",
+    "Deepak Chahar",
+    "Jos Buttler",
+    "Aiden Markram",
+    "Vipraj Nigam",
+    "Ajinkya Rahane",
+    "Aniket Verma",
+    "Pathum Nissanka",
+    "Donovan Ferreira",
+    "Vaibhav Arora",
+    "Wanindu Hasaranga",
+    "Suyash Sharma",
+    "Suryakumar Yadav",
+    "Kuldeep Sen",
+    "Lockie Ferguson",
+    "Digvesh Rathi",
+    "Nehal Wadhera",
+    "MS Dhoni",
+    "Mangesh Yadav",
+    "Mayank Yadav",
+    "Varun Chakravarthy",
+    "Liam Livingstone",
+    "Rajat Patidar",
+    "Ayush Mhatre",
+    "Nitish Rana",
+    "Arshad Khan",
+    "Mayank Markande",
+    "Khaleel Ahmed",
+    "David Miller",
+    "Yashasvi Jaiswal",
+    "Nitish Kumar Reddy",
+    "Dewald Brevis",
+    "Trent Boult",
+    "Sherfane Rutherford",
+    "Ravi Bishnoi",
+    "Sai Sudharsan",
+    "Priyansh Arya",
+    "Pat Cummins",
+    "Rachin Ravindra",
+    "Tristan Stubbs",
+    "Will Jacks",
+    "Azmatullah Omarzai",
+    "Rishabh Pant",
+    "Devdutt Padikkal",
+    "Jacob Bethell",
+    "Vaibhav Suryavanshi",
+    "Mukesh Kumar",
+    "Akash Deep",
+    "Shreyas Iyer",
+    "Sai Kishore",
+    "Prashant Veer",
+    "Anuj Rawat",
+    "Tim Seifert",
+    "Prabhsimran Singh",
+    "Venkatesh Iyer",
+    "Rashid Khan",
+    "Harsh Dubey",
+    "Travis Head",
+    "Riyan Parag",
+    "Jamie Overton",
+    "Brydon Carse",
+    "Yudhvir Singh",
+    "Glenn Phillips",
+    "Avesh Khan",
+    "Virat Kohli",
+    "Marcus Stoinis",
+    "Kumar Kushagra",
+    "Abhishek Sharma",
+    "Gurnoor Brar",
+    "Jasprit Bumrah",
+    "Kamindu Mendis",
+    "Shahbaz Ahmed",
+    "Krunal Pandya",
+    "Ishant Sharma",
+    "Romario Shepherd",
+    "Naman Tiwari",
+    "Angkrish Raghuvanshi",
+    "Prasidh Krishna",
+    "Sameer Rizvi",
+    "Nicholas Pooran",
+    "T Natarajan",
+    "Ravichandran Smaran",
+    "Marco Jansen",
+    "Matheesha Pathirana",
+    "Ruturaj Gaikwad",
+    "Ayush Badoni",
+    "Sandeep Sharma",
+    "Shimron Hetmyer",
+    "Karun Nair",
+    "KL Rahul",
+    "Vijaykumar Vyshak",
+    "Umran Malik",
+    "Cameron Green",
+    "Ryan Rickelton",
+    "Harpreet Brar",
+    "Shivam Mavi",
+    "Dhruv Jurel",
+    "Ramandeep Singh",
+    "Hardik Pandya",
+    "Jitesh Sharma",
+    "Mitchell Santner",
+    "Zeeshan Ansari",
+    "Shivam Dube",
+    "Sam Curran",
+    "Akeal Hosein",
+    "Shardul Thakur",
+    "Manish Pandey",
+    "Mitchell Starc",
+    "Axar Patel",
+    "Yash Thakur",
+    "Phil Salt",
+    "Yuzvendra Chahal",
+    "Kartik Sharma",
+    "Kagiso Rabada",
+    "Allah Ghazanfar",
+    "Jacob Duffy",
+    "Matt Henry",
+    "Josh Inglis",
+    "Blessing Muzarabani",
+    "Jofra Archer",
+    "Abishek Porel",
+    "Mohammed Shami",
+    "Xavier Bartlett",
+    "Harshal Patel",
+    "Kuldeep Yadav",
+    "Rohit Sharma",
+    "Jason Holder",
+    "Ashwani Kumar",
+    "Eshan Malinga",
+    "Ashutosh Sharma",
+    "Sanju Samson",
+    "Sunil Narine",
+    "Arshdeep Singh",
+    "Ravindra Jadeja",
+    "Prithvi Shaw",
+    "Mitchell Marsh",
+    "Auqib Nabi",
+    "Tushar Deshpande",
+    "Mohammed SIraj",
+    "Tim David",
+    "Tilak Varma",
+    "Nandre Burger",
+    "Yash Dayal",
+    "Rinku Singh",
+    "Noor Ahmad",
+    "M Shahrukh Khan",
+    "Akash Singh",
+    "Rahul Tripathi",
+    "Ishan Kishan",
+    "Anshul Kamboj",
+    "Quinton de Kock",
+    "Bhuvneshwar Kumar",
+    "Shubman Gill",
+    "Urvil Patel",
+    "Nuwan Thushara",
+    "Anukul Roy",
+    "Shashank Singh",
+    "Rasikh Salam",
+    "Finn Allen",
+    "Vishnu Vinod",
+    "Kwena Maphaka",
+    "Mohsin Khan",
+    "Adam Milne",
+    "Rahul Chahar",
+    "Musheer Khan",
+    "Corbin Bosch",
+    "Sarfaraz Khan",
+    "Lungi Ngidi",
+    "Abdul Samad",
+    "Naman Dhir",
+    "Josh Hazlewood",
+    "Heinrich Klaasen",
+    "Rahul Tewatia",
+    "Mitchell Owen",
+    "Washington Sundar",
+    "Jaydev Unadkat",
+    "Salil Arora",
+    "Anrich Nortje",
+]
+
+
+def _parse_name_set(raw: object) -> list[str]:
+    if raw is None or (isinstance(raw, float) and pd.isna(raw)):
+        return []
+    text = str(raw).strip()
+    if not text or text.lower() in {"nan", "<na>", "none"}:
+        return []
+    quoted = re.findall(r'"([^"]+)"', text)
+    if quoted:
+        return [q.strip() for q in quoted if q.strip()]
+    try:
+        parsed = ast.literal_eval(text)
+        if isinstance(parsed, (set, list, tuple)):
+            return [str(x).strip() for x in parsed if str(x).strip()]
+        if isinstance(parsed, str) and parsed.strip():
+            return [parsed.strip()]
+    except Exception:
+        pass
+    return [text]
+
+
+def _max_tier_points(value: float, tiers: list[tuple[float, float]]) -> float:
+    points = 0.0
+    for threshold, pts in tiers:
+        if value >= threshold:
+            points = float(pts)
+    return points
+
+
+def _resolve_requested_player(requested_name: str, player_pool: set[str]) -> str | None:
+    if requested_name in player_pool:
+        return requested_name
+
+    explicit = {
+        "Deepak Chahar": "DL Chahar",
+        "Jos Buttler": "JC Buttler",
+        "Aiden Markram": "AK Markram",
+        "Ajinkya Rahane": "AM Rahane",
+        "Pathum Nissanka": "P Nissanka",
+        "Kamindu Mendis": "BKG Mendis",
+        "Naman Tiwari": "M Tiwari",
+        "Shreyas Iyer": "SS Iyer",
+        "Rajat Patidar": "RM Patidar",
+        "Axar Patel": "AR Patel",
+        "Rinku Singh": "RK Singh",
+        "Travis Head": "TM Head",
+        "Nehal Wadhera": "N Wadhera",
+        "Dewald Brevis": "D Brevis",
+        "Sherfane Rutherford": "SE Rutherford",
+        "Jitesh Sharma": "JM Sharma",
+        "Khaleel Ahmed": "KK Ahmed",
+        "Pat Cummins": "PJ Cummins",
+        "Bhuvneshwar Kumar": "B Kumar",
+        "Mitchell Starc": "MA Starc",
+        "Lungi Ngidi": "L Ngidi",
+        "Shardul Thakur": "SN Thakur",
+        "Yuzvendra Chahal": "YS Chahal",
+        "Varun Chakravarthy": "CV Varun",
+        "Varun Chakaravarthy": "CV Varun",
+        "CV Varun": "CV Varun",
+        "Rishabh Pant": "RR Pant",
+        "Ruturaj Gaikwad": "RD Gaikwad",
+        "Ravindra Jadeja": "RA Jadeja",
+        "Heinrich Klaasen": "H Klaasen",
+        "Mohammed Siraj": "Mohammed Siraj",
+        "Mohammed SIraj": "Mohammed Siraj",
+    }
+    if requested_name in explicit and explicit[requested_name] in player_pool:
+        return explicit[requested_name]
+
+    requested_tokens = [t for t in re.split(r"\s+", requested_name.strip()) if t]
+    if not requested_tokens:
+        return None
+    requested_last = requested_tokens[-1].lower()
+    requested_first = requested_tokens[0].lower()
+    requested_first_initial = requested_first[0]
+    requested_last_initial = requested_last[0]
+
+    candidates = []
+    for candidate in player_pool:
+        cand_tokens = [t for t in re.split(r"\s+", str(candidate).strip()) if t]
+        if not cand_tokens:
+            continue
+        cand_last = cand_tokens[-1].lower()
+        cand_first = cand_tokens[0].lower()
+        cand_tokens_lower = [t.lower() for t in cand_tokens]
+        if cand_last != requested_last:
+            continue
+        score = 0
+        score += 3
+        if cand_first == requested_first:
+            score += 3
+        # Handle common IPL keys like "B Sai Sudharsan" where first-name token is not token[0].
+        if requested_first in cand_tokens_lower:
+            score += 4
+        if any(tok.startswith(requested_first) for tok in cand_tokens_lower):
+            score += 2
+        if cand_first.startswith(requested_first_initial):
+            score += 2
+        if requested_first.startswith(cand_first[:1]):
+            score += 1
+        candidates.append((score, candidate))
+
+    # Prevent wrong cross-mapping when only surname matches.
+    # Base surname match contributes 3 points, so require score > 3.
+    candidates = [c for c in candidates if c[0] > 3]
+    if not candidates:
+        return None
+    candidates.sort(key=lambda x: (-x[0], x[1]))
+    return candidates[0][1]
+
+
+@st.cache_data(show_spinner=False)
+def auction_points_for_players_by_season(
+    df: pd.DataFrame, requested_players: list[str], season: int
+) -> pd.DataFrame:
+    season_df = df[df["season"] == season].copy()
+    if season_df.empty:
+        return pd.DataFrame()
+
+    season_df["is_bowler_wicket"] = season_df["wicket_kind"].isin(BOWLER_WICKET_KINDS).astype(int)
+    season_df["is_four"] = (season_df["runs"] == 4).astype(int)
+    season_df["is_six"] = (season_df["runs"] == 6).astype(int)
+    season_df["runs_conceded"] = season_df["runs"] + season_df["wides"] + season_df["noballs"]
+    season_df["is_dot_ball"] = ((season_df["balls_bowled"] == 1) & (season_df["runs"] == 0)).astype(int)
+
+    match_meta = (
+        season_df.groupby("match_id", as_index=False)
+        .agg(
+            match_number=("match_number", "first"),
+            venue=("venue", "first"),
+            winner=("outcome_winner", "first"),
+            pom_raw=("player_of_match", "first"),
+            match_date=("match_date", "first"),
+        )
+        .copy()
+    )
+    match_meta["mn_num"] = pd.to_numeric(match_meta["match_number"], errors="coerce")
+    named_playoff = match_meta["match_number"].astype(str).str.lower().str.contains(
+        "qualifier|eliminator|final", na=False
+    )
+    missing_number_late = match_meta["mn_num"].isna() & match_meta["match_date"].notna()
+    match_meta["is_playoff"] = named_playoff | (match_meta["mn_num"] > 70) | missing_number_late
+    match_meta["pom_list"] = match_meta["pom_raw"].apply(_parse_name_set)
+
+    player_pool = set(season_df["batter"]) | set(season_df["non_striker"]) | set(season_df["bowler"])
+    participation = franchise_player_participation(season_df)
+    if not participation.empty:
+        player_pool |= set(participation["player"])
+
+    resolved_pairs = []
+    for requested in requested_players:
+        resolved = _resolve_requested_player(requested, player_pool)
+        # Manual disambiguation for this dataset: treat Mangesh Yadav as not present
+        # in 2023 and 2024 (player key collisions exist for initials-based Yadav entries).
+        if requested == "Mangesh Yadav" and season in {2023, 2024}:
+            resolved = None
+        # Manual disambiguation for this dataset: Urvil Patel should be 0 in 2023 and 2024.
+        if requested == "Urvil Patel" and season in {2023, 2024}:
+            resolved = None
+        resolved_pairs.append((requested, resolved))
+    resolved_keys = [resolved for _, resolved in resolved_pairs if resolved is not None]
+
+    batting_innings = (
+        season_df.groupby(["match_id", "innings_id", "batting_team", "batter"], as_index=False)
+        .agg(
+            runs=("runs", "sum"),
+            balls=("balls_faced", "sum"),
+            fours=("is_four", "sum"),
+            sixes=("is_six", "sum"),
+        )
+        .copy()
+    )
+    dismissals = season_df[
+        ~season_df["wicket_player_out"].astype(str).str.lower().isin({"", "nan", "none", "<na>"})
+    ]
+    dismissed_counts = (
+        dismissals.groupby(["match_id", "innings_id", "batting_team", "wicket_player_out"], as_index=False)
+        .size()
+        .rename(columns={"wicket_player_out": "batter", "size": "dismissals"})
+    )
+    batting_innings = batting_innings.merge(
+        dismissed_counts,
+        on=["match_id", "innings_id", "batting_team", "batter"],
+        how="left",
+    )
+    batting_innings["dismissals"] = batting_innings["dismissals"].fillna(0)
+    batting_innings["duck_pts"] = (
+        ((batting_innings["runs"] == 0) & (batting_innings["dismissals"] > 0)).astype(int) * -5
+    )
+    batting_innings["bat_run_pts"] = batting_innings["runs"]
+    batting_innings["bat_pace_pts"] = batting_innings["runs"] - batting_innings["balls"]
+    batting_innings["bat_milestone_pts"] = batting_innings["runs"].apply(
+        lambda x: _max_tier_points(x, [(20, 10), (40, 20), (70, 30), (100, 50)])
+    )
+    batting_innings["bat_boundary_pts"] = batting_innings["fours"] + (2 * batting_innings["sixes"])
+    batting_innings["bat_total_pts"] = (
+        batting_innings["bat_run_pts"]
+        + batting_innings["bat_pace_pts"]
+        + batting_innings["bat_milestone_pts"]
+        + batting_innings["bat_boundary_pts"]
+        + batting_innings["duck_pts"]
+    )
+    bat_totals = (
+        batting_innings[batting_innings["batter"].isin(resolved_keys)]
+        .groupby("batter", as_index=False)["bat_total_pts"]
+        .sum()
+        .rename(columns={"batter": "player"})
+    )
+
+    over_level = (
+        season_df.groupby(["match_id", "innings_id", "bowling_team", "bowler", "over_number"], as_index=False)
+        .agg(legal_balls=("balls_bowled", "sum"), runs_conceded=("runs_conceded", "sum"))
+        .copy()
+    )
+    maiden_counts = (
+        over_level[(over_level["legal_balls"] >= 6) & (over_level["runs_conceded"] == 0)]
+        .groupby(["match_id", "innings_id", "bowling_team", "bowler"], as_index=False)
+        .size()
+        .rename(columns={"size": "maidens"})
+    )
+    bowling_innings = (
+        season_df.groupby(["match_id", "innings_id", "bowling_team", "bowler"], as_index=False)
+        .agg(
+            balls=("balls_bowled", "sum"),
+            runs=("runs_conceded", "sum"),
+            wickets=("is_bowler_wicket", "sum"),
+            dots=("is_dot_ball", "sum"),
+        )
+        .copy()
+    )
+    bowling_innings = bowling_innings.merge(
+        maiden_counts,
+        on=["match_id", "innings_id", "bowling_team", "bowler"],
+        how="left",
+    )
+    bowling_innings["maidens"] = bowling_innings["maidens"].fillna(0)
+    bowling_innings["bowl_wicket_pts"] = 30 * bowling_innings["wickets"]
+    pace_raw = (1.5 * bowling_innings["balls"]) - bowling_innings["runs"]
+    bowling_innings["bowl_pace_pts"] = pace_raw.where(pace_raw <= 0, pace_raw * 2.5)
+    bowling_innings["bowl_milestone_pts"] = bowling_innings["wickets"].apply(
+        lambda x: _max_tier_points(x, [(2, 10), (3, 20), (4, 30), (5, 50)])
+    )
+    bowling_innings["bowl_dot_pts"] = 1.5 * bowling_innings["dots"]
+    bowling_innings["bowl_maiden_pts"] = 30 * bowling_innings["maidens"]
+    bowling_innings["bowl_total_pts"] = (
+        bowling_innings["bowl_wicket_pts"]
+        + bowling_innings["bowl_pace_pts"]
+        + bowling_innings["bowl_milestone_pts"]
+        + bowling_innings["bowl_dot_pts"]
+        + bowling_innings["bowl_maiden_pts"]
+    )
+    bowl_totals = (
+        bowling_innings[bowling_innings["bowler"].isin(resolved_keys)]
+        .groupby("bowler", as_index=False)["bowl_total_pts"]
+        .sum()
+        .rename(columns={"bowler": "player"})
+    )
+
+    field_rows = []
+    field_events = season_df[season_df["wicket_kind"].isin(FIELDING_POINTS_KINDS)][
+        ["match_id", "innings_id", "bowling_team", "wicket_kind", "wicket_fielders"]
+    ]
+    for row in field_events.itertuples(index=False):
+        for name in _parse_name_set(getattr(row, "wicket_fielders")):
+            field_rows.append(
+                {
+                    "player": name,
+                    "match_id": getattr(row, "match_id"),
+                    "innings_id": getattr(row, "innings_id"),
+                    "franchise": getattr(row, "bowling_team"),
+                    "field_total_pts": 10.0,
+                    "is_catch": 1 if getattr(row, "wicket_kind") == "caught" else 0,
+                }
+            )
+    field_df = pd.DataFrame(
+        field_rows,
+        columns=["player", "match_id", "innings_id", "franchise", "field_total_pts", "is_catch"],
+    )
+    field_totals = (
+        field_df[field_df["player"].isin(resolved_keys)]
+        .groupby("player", as_index=False)["field_total_pts"]
+        .sum()
+        if not field_df.empty
+        else pd.DataFrame(columns=["player", "field_total_pts"])
+    )
+
+    appearances = franchise_player_participation(season_df)
+    appearances = appearances[["match_id", "franchise", "player"]].drop_duplicates()
+    bonus = appearances.merge(
+        match_meta[["match_id", "is_playoff", "venue", "winner", "pom_list"]],
+        on="match_id",
+        how="left",
+    )
+    bonus = bonus[bonus["player"].isin(resolved_keys)].copy()
+    bonus["appearance_pts"] = bonus["is_playoff"].apply(lambda x: 10.0 if x else 5.0)
+    bonus["win_pts"] = bonus.apply(
+        lambda r: 0.0
+        if r["franchise"] != r["winner"]
+        else (15.0 if r["is_playoff"] else (5.0 if r["venue"] in HOME_VENUES_BY_FRANCHISE.get(r["franchise"], set()) else 10.0)),
+        axis=1,
+    )
+    bonus["pom_pts"] = bonus.apply(
+        lambda r: 25.0 if r["player"] in (r["pom_list"] if isinstance(r["pom_list"], list) else []) else 0.0,
+        axis=1,
+    )
+    bonus_summary = (
+        bonus.groupby("player", as_index=False)
+        .agg(
+            matches_played=("match_id", "nunique"),
+            appearance_winning_pts=("appearance_pts", "sum"),
+            win_pts=("win_pts", "sum"),
+            pom_pts=("pom_pts", "sum"),
+        )
+        .copy()
+    )
+    bonus_summary["appearance_winning_pts"] = bonus_summary["appearance_winning_pts"] + bonus_summary["win_pts"]
+
+    league_df = season_df.merge(match_meta[["match_id", "is_playoff"]], on="match_id", how="left")
+    league_df = league_df[~league_df["is_playoff"]].copy()
+
+    legal_balls_league = float(league_df["balls_bowled"].sum())
+    season_t_rpo = (
+        float(league_df["total_runs"].sum()) / (legal_balls_league / 6.0) if legal_balls_league > 0 else 0.0
+    )
+
+    bat_league = (
+        league_df[league_df["batter"].isin(resolved_keys)]
+        .groupby("batter", as_index=False)
+        .agg(runs=("runs", "sum"), balls=("balls_faced", "sum"), fours=("is_four", "sum"), sixes=("is_six", "sum"))
+        .rename(columns={"batter": "player"})
+    )
+    bat_league["rpo"] = 0.0
+    mask_balls = bat_league["balls"] > 0
+    bat_league.loc[mask_balls, "rpo"] = 6.0 * bat_league.loc[mask_balls, "runs"] / bat_league.loc[mask_balls, "balls"]
+    bat_league["batting_bonus"] = bat_league.apply(
+        lambda r: _max_tier_points(r["runs"], [(250, 50), (375, 100), (500, 200), (600, 300)])
+        + _max_tier_points(r["fours"], [(40, 25), (50, 50), (60, 75)])
+        + _max_tier_points(r["sixes"], [(20, 50), (25, 75), (30, 100)])
+        + (
+            _max_tier_points(max(0.0, r["rpo"] - season_t_rpo), [(1.0, 50), (1.5, 75), (2.0, 100)])
+            if r["runs"] >= 250
+            else 0.0
+        ),
+        axis=1,
+    )
+
+    bowl_league_innings = bowling_innings[bowling_innings["match_id"].isin(set(league_df["match_id"]))].copy()
+    bowl_league = (
+        bowl_league_innings[bowl_league_innings["bowler"].isin(resolved_keys)]
+        .groupby("bowler", as_index=False)
+        .agg(wickets=("wickets", "sum"), dots=("dots", "sum"), balls=("balls", "sum"), runs=("runs", "sum"))
+        .rename(columns={"bowler": "player"})
+    )
+    two_w = (
+        bowl_league_innings[bowl_league_innings["bowler"].isin(resolved_keys)]
+        .groupby("bowler", as_index=False)
+        .agg(two_w_hauls=("wickets", lambda s: int((s >= 2).sum())))
+        .rename(columns={"bowler": "player"})
+    )
+    bowl_league = bowl_league.merge(two_w, on="player", how="left")
+    bowl_league["two_w_hauls"] = bowl_league["two_w_hauls"].fillna(0)
+    bowl_league["economy"] = 0.0
+    mask_bowl_balls = bowl_league["balls"] > 0
+    bowl_league.loc[mask_bowl_balls, "economy"] = 6.0 * bowl_league.loc[mask_bowl_balls, "runs"] / bowl_league.loc[mask_bowl_balls, "balls"]
+    bowl_league["bowling_bonus"] = bowl_league.apply(
+        lambda r: _max_tier_points(r["wickets"], [(12, 50), (16, 100), (19, 200), (22, 300)])
+        + _max_tier_points(r["dots"], [(100, 25), (115, 50), (130, 75)])
+        + _max_tier_points(r["two_w_hauls"], [(4, 50), (5, 75), (6, 100)])
+        + (
+            _max_tier_points(max(0.0, season_t_rpo - r["economy"]), [(1.0, 50), (1.5, 75), (2.0, 100)])
+            if r["balls"] >= 168
+            else 0.0
+        ),
+        axis=1,
+    )
+
+    field_bonus = pd.DataFrame(columns=["player", "fielding_bonus"])
+    if not field_df.empty:
+        field_league = field_df[field_df["match_id"].isin(set(league_df["match_id"]))].copy()
+        field_bonus = (
+            field_league[field_league["player"].isin(resolved_keys)]
+            .groupby("player", as_index=False)
+            .agg(catches=("is_catch", "sum"))
+        )
+        field_bonus["fielding_bonus"] = field_bonus["catches"].apply(
+            lambda x: _max_tier_points(x, [(6, 25), (8, 50), (10, 75)])
+        )
+        field_bonus = field_bonus[["player", "fielding_bonus"]]
+
+    all_round = pd.DataFrame({"player": resolved_keys}).drop_duplicates()
+    all_round = all_round.merge(bat_league[["player", "runs"]], on="player", how="left")
+    all_round = all_round.merge(bowl_league[["player", "wickets"]], on="player", how="left")
+    all_round["runs"] = all_round["runs"].fillna(0)
+    all_round["wickets"] = all_round["wickets"].fillna(0)
+    all_round["all_round_bonus"] = all_round.apply(
+        lambda r: max(
+            150.0 if (r["runs"] >= 125 and r["wickets"] >= 10) else 0.0,
+            150.0 if (r["runs"] >= 250 and r["wickets"] >= 5) else 0.0,
+            75.0 if (r["runs"] >= 75 and r["wickets"] >= 10) else 0.0,
+            75.0 if (r["runs"] >= 175 and r["wickets"] >= 5) else 0.0,
+        ),
+        axis=1,
+    )
+
+    rows = []
+    for requested_name, resolved_name in resolved_pairs:
+        if resolved_name is None:
+            rows.append(
+                {
+                    "Player Name": requested_name,
+                    "Matches Played": 0,
+                    "Total Points": 0.0,
+                    "Points per game": 0.0,
+                    "Total Match Points": 0.0,
+                    "Total Tournament Points": 0.0,
+                    "Total Batting Points": 0.0,
+                    "Total Bowling Points": 0.0,
+                    "Total Fielding Points": 0.0,
+                    "Total Appearance+Winning Points": 0.0,
+                    "Batting Bonuses": 0.0,
+                    "Bowling Bonuses": 0.0,
+                    "Fielding Bonuses": 0.0,
+                }
+            )
+            continue
+
+        bat_pts = float(bat_totals.loc[bat_totals["player"] == resolved_name, "bat_total_pts"].sum())
+        bowl_pts = float(bowl_totals.loc[bowl_totals["player"] == resolved_name, "bowl_total_pts"].sum())
+        field_pts = float(field_totals.loc[field_totals["player"] == resolved_name, "field_total_pts"].sum())
+
+        matches = int(bonus_summary.loc[bonus_summary["player"] == resolved_name, "matches_played"].sum())
+        app_win_pts = float(
+            bonus_summary.loc[bonus_summary["player"] == resolved_name, "appearance_winning_pts"].sum()
+        )
+        pom_pts = float(bonus_summary.loc[bonus_summary["player"] == resolved_name, "pom_pts"].sum())
+
+        batting_bonus = float(bat_league.loc[bat_league["player"] == resolved_name, "batting_bonus"].sum())
+        bowling_bonus = float(bowl_league.loc[bowl_league["player"] == resolved_name, "bowling_bonus"].sum())
+        fielding_bonus = float(field_bonus.loc[field_bonus["player"] == resolved_name, "fielding_bonus"].sum())
+        all_round_bonus = float(all_round.loc[all_round["player"] == resolved_name, "all_round_bonus"].sum())
+
+        total_match_points = bat_pts + bowl_pts + field_pts + app_win_pts + pom_pts
+        total_tournament_points = batting_bonus + bowling_bonus + fielding_bonus + all_round_bonus
+        total_points = total_match_points + total_tournament_points
+        points_per_game = (total_points / matches) if matches > 0 else 0.0
+
+        rows.append(
+            {
+                "Player Name": requested_name,
+                "Matches Played": matches,
+                "Total Points": round(total_points, 2),
+                "Points per game": round(points_per_game, 2),
+                "Total Match Points": round(total_match_points, 2),
+                "Total Tournament Points": round(total_tournament_points, 2),
+                "Total Batting Points": round(bat_pts, 2),
+                "Total Bowling Points": round(bowl_pts, 2),
+                "Total Fielding Points": round(field_pts, 2),
+                "Total Appearance+Winning Points": round(app_win_pts, 2),
+                "Batting Bonuses": round(batting_bonus, 2),
+                "Bowling Bonuses": round(bowling_bonus, 2),
+                "Fielding Bonuses": round(fielding_bonus, 2),
+            }
+        )
+
+    return pd.DataFrame(rows)
+
+
+def render_auction_full_tab(df: pd.DataFrame, season: int) -> None:
+    st.subheader(f"Auction Points - {season} (Full List)")
+    st.caption(
+        "Columns use finalized logic: match points innings-wise; appearance/winning bonuses include playoff uplift; "
+        "tournament bonuses are league-stage only and highest-tier-only per category."
+    )
+    table = auction_points_for_players_by_season(df, AUCTION_2025_TEST_PLAYERS, season)
+    if table.empty:
+        st.warning(f"No {season} data available.")
+        return
+    table = (
+        table.sort_values(["Points per game", "Player Name"], ascending=[False, True])
+        .reset_index(drop=True)
+        .copy()
+    )
+    st.dataframe(table, use_container_width=True, hide_index=True)
+
+
+@st.cache_data(show_spinner=False)
+def most_impactful_players_table(df: pd.DataFrame, requested_players: list[str]) -> pd.DataFrame:
+    t2025 = auction_points_for_players_by_season(df, requested_players, 2025).copy()
+    t2024 = auction_points_for_players_by_season(df, requested_players, 2024).copy()
+    t2023 = auction_points_for_players_by_season(df, requested_players, 2023).copy()
+
+    for frame, suffix in [(t2025, "2025"), (t2024, "2024"), (t2023, "2023")]:
+        frame.rename(
+            columns={
+                "Matches Played": f"Matches {suffix}",
+                "Points per game": f"PPG {suffix}",
+                "Total Points": f"Total {suffix}",
+            },
+            inplace=True,
+        )
+
+    merged = t2025[["Player Name", "Matches 2025", "PPG 2025", "Total 2025"]].merge(
+        t2024[["Player Name", "Matches 2024", "PPG 2024", "Total 2024"]],
+        on="Player Name",
+        how="outer",
+    )
+    merged = merged.merge(
+        t2023[["Player Name", "Matches 2023", "PPG 2023", "Total 2023"]],
+        on="Player Name",
+        how="outer",
+    )
+
+    for col in [
+        "Matches 2025",
+        "Matches 2024",
+        "Matches 2023",
+        "PPG 2025",
+        "PPG 2024",
+        "PPG 2023",
+        "Total 2025",
+        "Total 2024",
+        "Total 2023",
+    ]:
+        merged[col] = pd.to_numeric(merged[col], errors="coerce").fillna(0)
+
+    merged["Total games played across 2023-2025"] = (
+        merged["Matches 2025"] + merged["Matches 2024"] + merged["Matches 2023"]
+    )
+    # Consolidated PPG is the average across only seasons played (matches > 0).
+    merged["seasons_played_count"] = (
+        (merged["Matches 2025"] > 0).astype(int)
+        + (merged["Matches 2024"] > 0).astype(int)
+        + (merged["Matches 2023"] > 0).astype(int)
+    )
+    merged["Average points per game across 2023-2025"] = 0.0
+    played_mask = merged["seasons_played_count"] > 0
+    merged.loc[played_mask, "Average points per game across 2023-2025"] = (
+        merged.loc[played_mask, "PPG 2025"]
+        + merged.loc[played_mask, "PPG 2024"]
+        + merged.loc[played_mask, "PPG 2023"]
+    ) / merged.loc[played_mask, "seasons_played_count"]
+
+    # Eligibility: played at least 7 games in at least one of the seasons.
+    eligible = merged[
+        (merged["Matches 2025"] >= 7)
+        | (merged["Matches 2024"] >= 7)
+        | (merged["Matches 2023"] >= 7)
+    ].copy()
+
+    eligible = eligible.sort_values(
+        ["Average points per game across 2023-2025", "Player Name"],
+        ascending=[False, True],
+    ).reset_index(drop=True)
+
+    out = eligible[
+        [
+            "Player Name",
+            "Total games played across 2023-2025",
+            "Average points per game across 2023-2025",
+            "PPG 2025",
+            "PPG 2024",
+            "PPG 2023",
+        ]
+    ].copy()
+    out.rename(
+        columns={
+            "PPG 2025": "Average points per game 2025",
+            "PPG 2024": "Average points per game 2024",
+            "PPG 2023": "Average points per game 2023",
+        },
+        inplace=True,
+    )
+    for col in [
+        "Average points per game across 2023-2025",
+        "Average points per game 2025",
+        "Average points per game 2024",
+        "Average points per game 2023",
+    ]:
+        out[col] = out[col].round(2)
+    out["Total games played across 2023-2025"] = out[
+        "Total games played across 2023-2025"
+    ].astype(int)
+    return out
+
+
+def render_most_impactful_players_tab(df: pd.DataFrame) -> None:
+    st.subheader("Most Impactful Players")
+    st.caption(
+        "Eligibility: player must have played at least 7 games in at least one season among 2023-2025. "
+        "Sorted by average points per game across 2023-2025 (descending)."
+    )
+    out = most_impactful_players_table(df, AUCTION_2025_TEST_PLAYERS)
+    if out.empty:
+        st.warning("No eligible players found.")
+        return
+    st.dataframe(out, use_container_width=True, hide_index=True)
+
+
 st.title("IPL Dashboards (2023-2025)")
 st.caption("Built from ball-by-ball IPL data.")
 
@@ -4928,8 +5765,12 @@ if focus_df.empty:
     st.warning("No data available in seasons 2023-2025.")
     st.stop()
 
-main_tab, phase_runs_tab, phase_wickets_tab, batter_impact_tab, bowling_impact_tab, batter_summary_tab, dot_ball_tab, boundary_impact_tab, bowling_avg_tab, batter_variance_tab, batter_30plus_tab, bowler_2w_tab, venue_summary_tab, franchise_consistency_tab, best_batters_venue_tab, home_batting_tab, home_bowling_tab, away_batting_tab, away_bowling_tab, batter_home_away_variance_tab, bowler_home_away_variance_tab, nehal_summary_tab, naman_summary_tab, angkrish_summary_tab, ayush_summary_tab, dewald_summary_tab, rajat_summary_tab, dhruv_summary_tab, rutherford_summary_tab, shivam_summary_tab, jitesh_summary_tab, shashank_summary_tab, ashutosh_summary_tab, ramandeep_summary_tab, aniket_summary_tab, riyan_summary_tab, shreyas_summary_tab, tilak_summary_tab, axar_summary_tab, hardik_summary_tab, rinku_summary_tab, today_batters_sr_tab, siraj_bowler_tab, shami_bowler_tab, bhuvi_bowler_tab, archer_bowler_tab, deepak_bowler_tab, yash_bowler_tab, khaleel_bowler_tab, vaibhav_bowler_tab, cummins_bowler_tab, unadkat_bowler_tab, avesh_bowler_tab, starc_bowler_tab, lungi_bowler_tab, omerzai_bowler_tab, deshpande_bowler_tab, rabada_bowler_tab, target_bowler_rank_tab = st.tabs(
+auction_2025_test_tab, auction_2024_test_tab, auction_2023_test_tab, impactful_players_tab, main_tab, phase_runs_tab, phase_wickets_tab, batter_impact_tab, bowling_impact_tab, batter_summary_tab, dot_ball_tab, boundary_impact_tab, bowling_avg_tab, batter_variance_tab, batter_30plus_tab, bowler_2w_tab, venue_summary_tab, franchise_consistency_tab, best_batters_venue_tab, home_batting_tab, home_bowling_tab, away_batting_tab, away_bowling_tab, batter_home_away_variance_tab, bowler_home_away_variance_tab, nehal_summary_tab, naman_summary_tab, angkrish_summary_tab, ayush_summary_tab, dewald_summary_tab, rajat_summary_tab, dhruv_summary_tab, rutherford_summary_tab, shivam_summary_tab, jitesh_summary_tab, shashank_summary_tab, ashutosh_summary_tab, ramandeep_summary_tab, aniket_summary_tab, riyan_summary_tab, shreyas_summary_tab, tilak_summary_tab, axar_summary_tab, hardik_summary_tab, rinku_summary_tab, today_batters_sr_tab, siraj_bowler_tab, shami_bowler_tab, bhuvi_bowler_tab, archer_bowler_tab, deepak_bowler_tab, yash_bowler_tab, khaleel_bowler_tab, vaibhav_bowler_tab, cummins_bowler_tab, unadkat_bowler_tab, avesh_bowler_tab, starc_bowler_tab, lungi_bowler_tab, omerzai_bowler_tab, deshpande_bowler_tab, rabada_bowler_tab, target_bowler_rank_tab = st.tabs(
     [
+        "Auction Points 2025 - Full",
+        "Auction Points 2024 - Full",
+        "Auction Points 2023 - Full",
+        "Most Impactful Players",
         "Runs & Wickets",
         "Phase-wise Runs",
         "Phase-wise Wickets",
@@ -5448,3 +6289,15 @@ with rabada_bowler_tab:
 
 with target_bowler_rank_tab:
     render_target_bowler_consolidated_tab(focus_df)
+
+with auction_2025_test_tab:
+    render_auction_full_tab(focus_df, 2025)
+
+with auction_2024_test_tab:
+    render_auction_full_tab(focus_df, 2024)
+
+with auction_2023_test_tab:
+    render_auction_full_tab(focus_df, 2023)
+
+with impactful_players_tab:
+    render_most_impactful_players_tab(focus_df)
